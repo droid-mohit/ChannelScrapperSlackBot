@@ -23,8 +23,8 @@ s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=
 
 class Workspace(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    team_id = db.Column(db.String(255), unique=True, nullable=False)
-    name = db.Column(db.String(255), unique=True, nullable=True)
+    team_id = db.Column(db.String(255), unique=False, nullable=False)
+    name = db.Column(db.String(255), unique=False, nullable=True)
     bot_auth_token = db.Column(db.String(255), unique=True, nullable=False)
 
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -41,8 +41,8 @@ class SlackBotConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     workspace = db.Column(db.Integer, db.ForeignKey('workspace.id'), nullable=False)
     channel_id = db.Column(db.String(255), unique=True, nullable=False)
-    user_id = db.Column(db.String(255), unique=True, nullable=True)
-    event_ts = db.Column(db.String(255), unique=True, nullable=True)
+    user_id = db.Column(db.String(255), unique=False, nullable=True)
+    event_ts = db.Column(db.String(255), unique=False, nullable=True)
 
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
@@ -140,21 +140,25 @@ def bot_mention():
                         slack_bot_config = SlackBotConfig.query.filter_by(workspace=workspace.id,
                                                                           channel_id=channel_id).first()
                         if not slack_bot_config:
-                            new_slack_bot_config = SlackBotConfig(workspace=workspace.id, channel_id=channel_id,
-                                                                  user_id=user, event_ts=event_ts)
-                            db.session.add(new_slack_bot_config)
-                            db.session.commit()
+                            try:
+                                new_slack_bot_config = SlackBotConfig(workspace=workspace.id, channel_id=channel_id,
+                                                                      user_id=user, event_ts=event_ts)
+                                db.session.add(new_slack_bot_config)
+                                db.session.commit()
+                            except Exception as e:
+                                print(f"Error while saving SlackBotConfig for channel_id:{channel_id} with error: {e}")
+                                db.session.rollback()
 
-                            if PUSH_TO_S3:
-                                data_to_upload = {'workspace_name': workspace.name, 'workspace_id': workspace.team_id,
-                                                  'bot_auth_token': workspace.bot_auth_token, 'channel_id': channel_id,
-                                                  'user_id': user, 'event_ts': event_ts}
-                                json_data = json.dumps(data_to_upload)
-                                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-                                key = f'{workspace.name}-{channel_id}-{current_time}.json'
-                                s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
+                        if PUSH_TO_S3:
+                            data_to_upload = {'workspace_name': workspace.name, 'workspace_id': workspace.team_id,
+                                              'bot_auth_token': workspace.bot_auth_token, 'channel_id': channel_id,
+                                              'user_id': user, 'event_ts': event_ts}
+                            json_data = json.dumps(data_to_upload)
+                            current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                            key = f'{workspace.name}-{channel_id}-{current_time}.json'
+                            s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
 
-                            return jsonify({'success': True})
+                        return jsonify({'success': True})
     return jsonify({'success': True})
 
 
