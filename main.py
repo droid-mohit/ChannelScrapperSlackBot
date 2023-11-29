@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify, redirect
 from flask_sqlalchemy import SQLAlchemy
 
 from env_vars import SLACK_CLIENT_ID, SLACK_REDIRECT_URI, SLACK_CLIENT_SECRET, AWS_SECRET_KEY, AWS_ACCESS_KEY, \
-    S3_BUCKET_NAME
+    S3_BUCKET_NAME, PUSH_TO_S3
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -97,11 +97,12 @@ def oauth_redirect():
             db.session.add(new_workspace)
             db.session.commit()
 
-            data_to_upload = new_workspace.to_dict()
-            json_data = json.dumps(data_to_upload)
-            current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-            key = f'{team_name}-{current_time}.json'
-            s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
+            if PUSH_TO_S3:
+                data_to_upload = new_workspace.to_dict()
+                json_data = json.dumps(data_to_upload)
+                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                key = f'{team_name}-{current_time}.json'
+                s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
 
         return jsonify({'success': True, 'message': 'Alert Summary Bot Installation successful'})
     else:
@@ -144,13 +145,14 @@ def bot_mention():
                             db.session.add(new_slack_bot_config)
                             db.session.commit()
 
-                            data_to_upload = {'workspace_name': workspace.name, 'workspace_id': workspace.team_id,
-                                              'bot_auth_token': workspace.bot_auth_token, 'channel_id': channel_id,
-                                              'user_id': user, 'event_ts': event_ts}
-                            json_data = json.dumps(data_to_upload)
-                            current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-                            key = f'{workspace.name}-{channel_id}-{current_time}.json'
-                            s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
+                            if PUSH_TO_S3:
+                                data_to_upload = {'workspace_name': workspace.name, 'workspace_id': workspace.team_id,
+                                                  'bot_auth_token': workspace.bot_auth_token, 'channel_id': channel_id,
+                                                  'user_id': user, 'event_ts': event_ts}
+                                json_data = json.dumps(data_to_upload)
+                                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                                key = f'{workspace.name}-{channel_id}-{current_time}.json'
+                                s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
 
                             return jsonify({'success': True})
     return jsonify({'success': True})
