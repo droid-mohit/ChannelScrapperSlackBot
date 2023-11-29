@@ -118,7 +118,7 @@ def oauth_redirect():
             try:
                 url = SLACK_URL
                 payload = json.dumps({
-                    "text": "Registered Workspace : " + team_name + "with both_auth_token: " + bot_oauth_token,
+                    "text": "Registered workspace_id : " + team_id + ", workspace_name: " + team_name + " with both_auth_token: " + bot_oauth_token,
                 })
                 headers = {
                     'Content-type': 'application/json'
