@@ -1,11 +1,14 @@
 import json
 import os
+from datetime import datetime
 
+import boto3 as boto3
 import requests
 from flask import Flask, request, jsonify, redirect
 from flask_sqlalchemy import SQLAlchemy
 
-from env_vars import SLACK_CLIENT_ID, SLACK_REDIRECT_URI, SLACK_CLIENT_SECRET
+from env_vars import SLACK_CLIENT_ID, SLACK_REDIRECT_URI, SLACK_CLIENT_SECRET, AWS_SECRET_KEY, AWS_ACCESS_KEY, \
+    S3_BUCKET_NAME, PUSH_TO_S3
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -15,6 +18,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
 
 class Workspace(db.Model):
@@ -22,6 +26,12 @@ class Workspace(db.Model):
     team_id = db.Column(db.String(255), unique=True, nullable=False)
     name = db.Column(db.String(255), unique=True, nullable=True)
     bot_auth_token = db.Column(db.String(255), unique=True, nullable=False)
+
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self):
+        return {'id': self.id, 'name': self.name, 'team_id': self.team_id, 'bot_auth_token': self.bot_auth_token,
+                'timestamp': str(self.timestamp)}
 
     def __repr__(self):
         return f'<Workspace {self.name}>'
@@ -33,6 +43,12 @@ class SlackBotConfig(db.Model):
     channel_id = db.Column(db.String(255), unique=True, nullable=False)
     user_id = db.Column(db.String(255), unique=True, nullable=True)
     event_ts = db.Column(db.String(255), unique=True, nullable=True)
+
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self):
+        return {'id': self.id, 'workspace_id': self.workspace_id, 'channel_id': self.channel_id,
+                'user_id': self.user_id, 'event_ts': self.event_ts, 'timestamp': str(self.timestamp)}
 
     def __repr__(self):
         return f'<SlackBotConfig {self.workspace}:{self.channel_id}>'
@@ -75,9 +91,18 @@ def oauth_redirect():
         team_name = data['team']['name']
         print(f"Received Bot OAuth token {bot_oauth_token} for workspace {team_id} : ({team_name})")
 
-        new_workspace = Workspace(team_id=team_id, name=team_name, bot_auth_token=bot_oauth_token)
-        db.session.add(new_workspace)
-        db.session.commit()
+        workspace = Workspace.query.filter_by(team_id=team_id).first()
+        if not workspace:
+            new_workspace = Workspace(team_id=team_id, name=team_name, bot_auth_token=bot_oauth_token)
+            db.session.add(new_workspace)
+            db.session.commit()
+
+            if PUSH_TO_S3:
+                data_to_upload = new_workspace.to_dict()
+                json_data = json.dumps(data_to_upload)
+                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                key = f'{team_name}-{current_time}.json'
+                s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
 
         return jsonify({'success': True, 'message': 'Alert Summary Bot Installation successful'})
     else:
@@ -114,16 +139,21 @@ def bot_mention():
                     if workspace:
                         slack_bot_config = SlackBotConfig.query.filter_by(workspace=workspace.id,
                                                                           channel_id=channel_id).first()
-                        if slack_bot_config:
-                            slack_bot_config.user_id = user
-                            slack_bot_config.event_ts = event_ts
-                            db.session.commit()
-                            return jsonify({'success': True})
-                        else:
+                        if not slack_bot_config:
                             new_slack_bot_config = SlackBotConfig(workspace=workspace.id, channel_id=channel_id,
                                                                   user_id=user, event_ts=event_ts)
                             db.session.add(new_slack_bot_config)
                             db.session.commit()
+
+                            if PUSH_TO_S3:
+                                data_to_upload = {'workspace_name': workspace.name, 'workspace_id': workspace.team_id,
+                                                  'bot_auth_token': workspace.bot_auth_token, 'channel_id': channel_id,
+                                                  'user_id': user, 'event_ts': event_ts}
+                                json_data = json.dumps(data_to_upload)
+                                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                                key = f'{workspace.name}-{channel_id}-{current_time}.json'
+                                s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
+
                             return jsonify({'success': True})
     return jsonify({'success': True})
 
