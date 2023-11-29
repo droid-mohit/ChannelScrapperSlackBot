@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify, redirect
 from flask_sqlalchemy import SQLAlchemy
 
 from env_vars import SLACK_CLIENT_ID, SLACK_REDIRECT_URI, SLACK_CLIENT_SECRET, AWS_SECRET_KEY, AWS_ACCESS_KEY, \
-    S3_BUCKET_NAME, PUSH_TO_S3
+    S3_BUCKET_NAME, PUSH_TO_S3, PUSH_TO_LOCAL_DB, PUSH_TO_SLACK, SLACK_URL
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -91,22 +91,44 @@ def oauth_redirect():
         team_name = data['team']['name']
         print(f"Received Bot OAuth token {bot_oauth_token} for workspace {team_id} : ({team_name})")
 
-        workspace = Workspace.query.filter_by(team_id=team_id).first()
-        if not workspace:
-            new_workspace = Workspace(team_id=team_id, name=team_name, bot_auth_token=bot_oauth_token)
-            db.session.add(new_workspace)
-            db.session.commit()
+        if PUSH_TO_LOCAL_DB:
+            workspace = Workspace.query.filter_by(team_id=team_id).first()
+            if not workspace:
+                try:
+                    new_workspace = Workspace(team_id=team_id, name=team_name, bot_auth_token=bot_oauth_token)
+                    db.session.add(new_workspace)
+                    db.session.commit()
+                except Exception as e:
+                    print(f"Error while saving Workspace: {team_name} with error: {e}")
+                    db.session.rollback()
 
-            if PUSH_TO_S3:
-                data_to_upload = new_workspace.to_dict()
+        if PUSH_TO_S3:
+            try:
+                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                data_to_upload = {'name': team_name, 'team_id': team_id, 'bot_auth_token': bot_oauth_token,
+                                  'timestamp': str(current_time)}
                 json_data = json.dumps(data_to_upload)
                 current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-                key = f'{team_name}-{current_time}.json'
+                key = f'{team_id}-{current_time}.json'
                 s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
+            except Exception as e:
+                print(f"Error while saving Workspace: {team_name} to s3 with error: {e}")
 
+        if PUSH_TO_SLACK:
+            try:
+                url = SLACK_URL
+                payload = json.dumps({
+                    "text": "Registered Workspace : " + team_name + "with both_auth_token: " + bot_oauth_token,
+                })
+                headers = {
+                    'Content-type': 'application/json'
+                }
+                requests.request("POST", url, headers=headers, data=payload)
+            except Exception as e:
+                print(f"Error while sending Slack notification for Workspace: {team_name} with error: {e}")
         return jsonify({'success': True, 'message': 'Alert Summary Bot Installation successful'})
     else:
-        return jsonify({'error': 'Alert Summary Bot Installation failed'})
+        return jsonify({'error': 'Alert Summary Bot Installation failed. Check permissions with workspace owner/admin'})
 
 
 @app.route('/slack/events', methods=['POST'])
@@ -135,30 +157,51 @@ def bot_mention():
                 if channel_id and user and event_ts:
                     print(
                         f"Received bot mention in workspace {team_id} channel {channel_id}: by user {user} at ({event_ts})")
-                    workspace = Workspace.query.filter_by(team_id=team_id).first()
-                    if workspace:
-                        slack_bot_config = SlackBotConfig.query.filter_by(workspace=workspace.id,
-                                                                          channel_id=channel_id).first()
-                        if not slack_bot_config:
-                            try:
-                                new_slack_bot_config = SlackBotConfig(workspace=workspace.id, channel_id=channel_id,
-                                                                      user_id=user, event_ts=event_ts)
-                                db.session.add(new_slack_bot_config)
-                                db.session.commit()
-                            except Exception as e:
-                                print(f"Error while saving SlackBotConfig for channel_id:{channel_id} with error: {e}")
-                                db.session.rollback()
+                    if PUSH_TO_LOCAL_DB:
+                        try:
+                            workspace = Workspace.query.filter_by(team_id=team_id).first()
+                            if workspace:
+                                slack_bot_config = SlackBotConfig.query.filter_by(workspace=workspace.id,
+                                                                                  channel_id=channel_id).first()
+                                if not slack_bot_config:
+                                    try:
+                                        new_slack_bot_config = SlackBotConfig(workspace=workspace.id,
+                                                                              channel_id=channel_id,
+                                                                              user_id=user, event_ts=event_ts)
+                                        db.session.add(new_slack_bot_config)
+                                        db.session.commit()
+                                    except Exception as e:
+                                        print(
+                                            f"Error while saving SlackBotConfig: {team_id}:{channel_id} with error: {e}")
+                                        db.session.rollback()
+                        except Exception as e:
+                            print(f"Error while saving SlackBotConfig: {team_id}:{channel_id} with error: {e}")
 
-                        if PUSH_TO_S3:
-                            data_to_upload = {'workspace_name': workspace.name, 'workspace_id': workspace.team_id,
-                                              'bot_auth_token': workspace.bot_auth_token, 'channel_id': channel_id,
-                                              'user_id': user, 'event_ts': event_ts}
+                    if PUSH_TO_S3:
+                        try:
+                            data_to_upload = {'workspace_id': team_id, 'channel_id': channel_id, 'user_id': user,
+                                              'event_ts': event_ts}
                             json_data = json.dumps(data_to_upload)
                             current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-                            key = f'{workspace.name}-{channel_id}-{current_time}.json'
+                            key = f'{team_id}-{channel_id}-{current_time}.json'
                             s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
-
-                        return jsonify({'success': True})
+                        except Exception as e:
+                            print(
+                                f"Error while saving SlackBotConfig: {team_id}:{channel_id} to s3 with error: {e}")
+                    if PUSH_TO_SLACK:
+                        try:
+                            url = SLACK_URL
+                            payload = json.dumps({
+                                "text": "Registered channel for workspace_id : " + team_id + " " + "channel_id: " + channel_id + " " + "user_id: " + user + " " + "event_ts: " + event_ts,
+                            })
+                            headers = {
+                                'Content-type': 'application/json'
+                            }
+                            requests.request("POST", url, headers=headers, data=payload)
+                        except Exception as e:
+                            print(
+                                f"Error while sending Slack notification for SlackBotConfig: {team_id}:{channel_id} with error: {e}")
+                    return jsonify({'success': True})
     return jsonify({'success': True})
 
 
