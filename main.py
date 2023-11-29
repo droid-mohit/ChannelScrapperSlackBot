@@ -42,7 +42,7 @@ def oauth_redirect():
         return jsonify({'error': 'Alert Summary Bot Installation failed'})
 
 
-@app.route('/bot_mention', methods=['POST'])
+@app.route('/slack/events', methods=['POST'])
 def bot_mention():
     # Extract the authorization code from the request
     request_data = request.data.decode('utf-8')
@@ -70,40 +70,11 @@ def bot_mention():
     return jsonify({'success': True})
 
 
-@app.route('/slack/events', methods=['POST'])
-def slack_events():
-    # Verify the request comes from Slack
-    if request.headers.get('X-Slack-Signature') != request.headers.get('X-Slack-Signature'):
-        return jsonify({'error': 'Invalid request'}), 400
-
-    # Parse the request payload
-    payload = request.get_data(as_text=True)
-    data = request.json
-
-    # Verify the challenge parameter for URL verification
-    if 'challenge' in data:
-        return jsonify({'challenge': data['challenge']})
-
-    # Handle other events, e.g., message events
-    if 'event' in data:
-        event = data['event']
-
-        # Check if it's a message event
-        if event['type'] == 'message' and 'text' in event:
-            channel_id = event['channel']
-            message_text = event['text']
-
-            # Process the message as needed (you can send it to another server, etc.)
-            print(f"Received message in channel {channel_id}: {message_text}")
-
-    return jsonify({'success': True})
-
-
-@app.route('/hello', methods=['GET'])
+@app.route('/health_check', methods=['GET'])
 def hello():
-    print('Hello world!')
+    print('Slack Alert App Backend is Up and Running!')
     return jsonify({'success': True})
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=False)
