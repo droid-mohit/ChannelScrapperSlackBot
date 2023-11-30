@@ -189,12 +189,11 @@ def start_data_fetch():
     channel_id = request.args.get('channel')
     bot_auth_token = request.args.get('token')
     print(f"Initiating Data Fetch for channel_id: {channel_id}")
-    oldest_timestamp = time.time() - 172800
-    fetch_conversation_history(bot_auth_token, channel_id, oldest_timestamp=str(oldest_timestamp))
+    fetch_conversation_history(bot_auth_token, channel_id)
     return jsonify({'success': True})
 
 
-@app.route('/health_check', methods=['POST'])
+@app.route('/health_check', methods=['GET'])
 def hello():
     print('Slack Alert App Backend is Up and Running!')
     return jsonify({'success': True})
