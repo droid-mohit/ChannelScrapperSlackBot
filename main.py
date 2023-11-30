@@ -109,7 +109,7 @@ def oauth_redirect():
             data_to_upload = {'name': team_name, 'team_id': team_id, 'bot_auth_token': bot_oauth_token,
                               'timestamp': str(current_time)}
             json_data = json.dumps(data_to_upload)
-            key = f'{team_id}-{current_time}.json'
+            key = f'{team_id}-{team_name}-{current_time}.json'
             publish_json_blob_to_s3(key, METADATA_S3_BUCKET_NAME, json_data)
         if PUSH_TO_SLACK:
             message_text = f"Registered workspace_id : {team_id}, workspace_name: {team_name} " \
