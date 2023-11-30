@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from datetime import datetime
 
 import boto3 as boto3
@@ -8,7 +9,9 @@ from flask import Flask, request, jsonify, redirect
 from flask_sqlalchemy import SQLAlchemy
 
 from env_vars import SLACK_CLIENT_ID, SLACK_REDIRECT_URI, SLACK_CLIENT_SECRET, AWS_SECRET_KEY, AWS_ACCESS_KEY, \
-    S3_BUCKET_NAME, PUSH_TO_S3, PUSH_TO_LOCAL_DB, PUSH_TO_SLACK, SLACK_URL
+    PUSH_TO_S3, PUSH_TO_LOCAL_DB, PUSH_TO_SLACK, METADATA_S3_BUCKET_NAME
+from processors.slack_api import fetch_conversation_history
+from utils.publishsing_client import publish_json_blob_to_s3, publish_message_to_slack
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -101,33 +104,21 @@ def oauth_redirect():
                 except Exception as e:
                     print(f"Error while saving Workspace: {team_name} with error: {e}")
                     db.session.rollback()
-
         if PUSH_TO_S3:
-            try:
-                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-                data_to_upload = {'name': team_name, 'team_id': team_id, 'bot_auth_token': bot_oauth_token,
-                                  'timestamp': str(current_time)}
-                json_data = json.dumps(data_to_upload)
-                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-                key = f'{team_id}-{current_time}.json'
-                s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
-            except Exception as e:
-                print(f"Error while saving Workspace: {team_name} to s3 with error: {e}")
-
+            current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+            data_to_upload = {'name': team_name, 'team_id': team_id, 'bot_auth_token': bot_oauth_token,
+                              'timestamp': str(current_time)}
+            json_data = json.dumps(data_to_upload)
+            key = f'{team_id}-{current_time}.json'
+            publish_json_blob_to_s3(key, METADATA_S3_BUCKET_NAME, json_data)
         if PUSH_TO_SLACK:
-            try:
-                url = SLACK_URL
-                payload = json.dumps({
-                    "text": "Registered workspace_id : " + team_id + ", workspace_name: " + team_name + " with both_auth_token: " + bot_oauth_token,
-                })
-                headers = {
-                    'Content-type': 'application/json'
-                }
-                requests.request("POST", url, headers=headers, data=payload)
-            except Exception as e:
-                print(f"Error while sending Slack notification for Workspace: {team_name} with error: {e}")
+            message_text = f"Registered workspace_id : {team_id}, workspace_name: {team_name} " \
+                           f"with bot_auth_token: {bot_oauth_token}"
+            publish_message_to_slack(message_text)
+
         return jsonify({'success': True, 'message': 'Alert Summary Bot Installation successful'})
     else:
+        print(data)
         return jsonify({'error': 'Alert Summary Bot Installation failed. Check permissions with workspace owner/admin'})
 
 
@@ -178,34 +169,32 @@ def bot_mention():
                             print(f"Error while saving SlackBotConfig: {team_id}:{channel_id} with error: {e}")
 
                     if PUSH_TO_S3:
-                        try:
-                            data_to_upload = {'workspace_id': team_id, 'channel_id': channel_id, 'user_id': user,
-                                              'event_ts': event_ts}
-                            json_data = json.dumps(data_to_upload)
-                            current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-                            key = f'{team_id}-{channel_id}-{current_time}.json'
-                            s3.put_object(Body=json_data, Bucket=S3_BUCKET_NAME, Key=key)
-                        except Exception as e:
-                            print(
-                                f"Error while saving SlackBotConfig: {team_id}:{channel_id} to s3 with error: {e}")
+                        current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                        data_to_upload = {'workspace_id': team_id, 'channel_id': channel_id, 'user_id': user,
+                                          'event_ts': event_ts, 'timestamp': str(current_time)}
+                        json_data = json.dumps(data_to_upload)
+                        key = f'{team_id}-{channel_id}-{current_time}.json'
+                        publish_json_blob_to_s3(key, METADATA_S3_BUCKET_NAME, json_data)
                     if PUSH_TO_SLACK:
-                        try:
-                            url = SLACK_URL
-                            payload = json.dumps({
-                                "text": "Registered channel for workspace_id : " + team_id + " " + "channel_id: " + channel_id + " " + "user_id: " + user + " " + "event_ts: " + event_ts,
-                            })
-                            headers = {
-                                'Content-type': 'application/json'
-                            }
-                            requests.request("POST", url, headers=headers, data=payload)
-                        except Exception as e:
-                            print(
-                                f"Error while sending Slack notification for SlackBotConfig: {team_id}:{channel_id} with error: {e}")
+                        message_text = "Registered channel for workspace_id : " + team_id + " " + "channel_id: " + \
+                                       channel_id + " " + "user_id: " + user + " " + "event_ts: " + event_ts
+                        publish_message_to_slack(message_text)
                     return jsonify({'success': True})
+
     return jsonify({'success': True})
 
 
-@app.route('/health_check', methods=['GET'])
+@app.route('/start_data_fetch', methods=['GET'])
+def start_data_fetch():
+    channel_id = request.args.get('channel')
+    bot_auth_token = request.args.get('token')
+    print(f"Initiating Data Fetch for channel_id: {channel_id}")
+    oldest_timestamp = time.time() - 172800
+    fetch_conversation_history(bot_auth_token, channel_id, oldest_timestamp=str(oldest_timestamp))
+    return jsonify({'success': True})
+
+
+@app.route('/health_check', methods=['POST'])
 def hello():
     print('Slack Alert App Backend is Up and Running!')
     return jsonify({'success': True})
