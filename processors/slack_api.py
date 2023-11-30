@@ -57,10 +57,10 @@ def fetch_conversation_history(bot_auth_token, channel_id, latest_timestamp=None
             if 'messages' in response_paginated:
                 messages = response_paginated["messages"]
                 if not messages or len(messages) <= 0:
-                    visit_next_cursor = False
+                    break
                 new_timestamp = response_paginated["messages"][0]['ts']
                 if new_timestamp >= latest_timestamp:
-                    visit_next_cursor = False
+                    break
                 for message in response_paginated["messages"]:
                     temp = pd.DataFrame([{"full_message": message, "uuid": message.get('ts')}])
                     raw_data = pd.concat([temp, raw_data])
@@ -82,19 +82,30 @@ def fetch_conversation_history(bot_auth_token, channel_id, latest_timestamp=None
         raw_data = raw_data.reset_index(drop=True)
         duplicates = raw_data[raw_data.duplicated(subset='uuid', keep=False)]
         if duplicates.shape[0] > 0:
+            print(f"Handling {duplicates.shape[0]} duplicate messages for channel_id: {channel_id}")
             raw_data = raw_data.drop_duplicates(subset='uuid', keep='last')
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
+        latest_datetime = datetime.fromtimestamp(float(latest_timestamp))
         if channel_info:
             channel_name = channel_info['name']
-            team_id = channel_info['team_id']
-            csv_file_name = f"{team_id}-{channel_id}-{channel_name}-raw_data.csv"
+            team_id = channel_info['context_team_id']
+            csv_file_name = f"{team_id}-{channel_id}-{channel_name}-{latest_datetime}-raw_data.csv"
         else:
-            csv_file_name = f"{channel_id}-raw_data.csv"
+            csv_file_name = f"{channel_id}-{latest_datetime}-raw_data.csv"
         file_path = os.path.join(base_dir, csv_file_name)
 
         raw_data.to_csv(file_path, index=False)
         publish_object_file_to_s3(file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
         print(f"Successfully extracted {message_counter} messages for channel_id: {channel_id}")
+        try:
+            os.remove(file_path)
+            print(f"File '{file_path}' deleted successfully.")
+        except FileNotFoundError:
+            print(f"File '{file_path}' not found.")
+        except PermissionError:
+            print(f"Permission error. You may not have the necessary permissions to delete the file.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
     else:
         print(f"Exception occurred ot No messages found for channel_id: {channel_id}")
