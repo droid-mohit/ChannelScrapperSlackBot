@@ -28,6 +28,6 @@ s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=
 
 
 @celery.task(name='add')
-def data_fetch_job(channel_id: str, bot_auth_token: str):
+def data_fetch_job(bot_auth_token: str, channel_id: str):
     print(f"Initiating Data Fetch Job for channel_id: {channel_id}")
     fetch_conversation_history(bot_auth_token, channel_id)
