@@ -1,6 +1,5 @@
 import json
 import os
-import time
 from datetime import datetime
 
 import boto3 as boto3
@@ -10,7 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 from env_vars import SLACK_CLIENT_ID, SLACK_REDIRECT_URI, SLACK_CLIENT_SECRET, AWS_SECRET_KEY, AWS_ACCESS_KEY, \
     PUSH_TO_S3, PUSH_TO_LOCAL_DB, PUSH_TO_SLACK, METADATA_S3_BUCKET_NAME
-from processors.slack_api import fetch_conversation_history
+from tasks import data_fetch_job
 from utils.publishsing_client import publish_json_blob_to_s3, publish_message_to_slack
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -188,8 +187,7 @@ def bot_mention():
 def start_data_fetch():
     channel_id = request.args.get('channel')
     bot_auth_token = request.args.get('token')
-    print(f"Initiating Data Fetch for channel_id: {channel_id}")
-    fetch_conversation_history(bot_auth_token, channel_id)
+    data_fetch_job.delay(bot_auth_token, channel_id)
     return jsonify({'success': True})
 
 
