@@ -23,7 +23,7 @@ def get_slack_workspace_config_by(team_id: str, bot_auth_token: str = None, team
 
 def create_slack_workspace_config(team_id: str, bot_auth_token: str, team_name: str = None, should_update=True):
     try:
-        slack_workspace_config = get_slack_workspace_config_by(team_id=team_id, bot_auth_token=bot_auth_token)
+        slack_workspace_config = get_slack_workspace_config_by(team_id=team_id)
         if slack_workspace_config:
             if not should_update:
                 return slack_workspace_config, False

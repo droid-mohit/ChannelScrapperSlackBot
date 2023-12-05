@@ -33,12 +33,9 @@ class SlackApiProcessor:
         return None
 
     def fetch_conversation_history(self, channel_id, latest_timestamp=None, oldest_timestamp=None):
-        logger.info(f"Initiating Bulk Extraction for channel_id: {channel_id}")
         channel_info = self.fetch_channel_info(channel_id)
         raw_data = pd.DataFrame(columns=["uuid", "full_message"])
         message_counter = 0
-        if not latest_timestamp:
-            latest_timestamp = str(time.time())
         visit_next_cursor = True
         next_cursor = None
         try:
@@ -75,10 +72,10 @@ class SlackApiProcessor:
                         temp = pd.DataFrame([{"full_message": message, "uuid": message.get('ts')}])
                         raw_data = pd.concat([temp, raw_data])
                         message_counter = message_counter + 1
-                    logger.info(message_counter, " messages published.")
-                    logger.info("Extracted Data till", datetime.fromtimestamp(float(new_timestamp)))
-                if 'response_metadata' in response_paginated and 'next_cursor' in response_paginated[
-                    'response_metadata']:
+                    logger.info(f'{str(message_counter)}, messages published')
+                    logger.info(f'Extracted Data till {datetime.fromtimestamp(float(new_timestamp))}')
+                if 'response_metadata' in response_paginated and \
+                        'next_cursor' in response_paginated['response_metadata']:
                     next_cursor = response_paginated['response_metadata']['next_cursor']
                     time.sleep(1.5)
                 else:
