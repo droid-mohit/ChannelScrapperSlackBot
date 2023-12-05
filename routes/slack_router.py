@@ -12,6 +12,7 @@ from flask import jsonify, Blueprint
 from persistance.db_utils import create_slack_workspace_config, get_slack_workspace_config_by, create_slack_bot_config
 from processors.slack_api import SlackApiProcessor
 from utils.publishsing_client import publish_json_blob_to_s3, publish_message_to_slack
+from utils.time_utils import get_current_datetime
 
 slack_blueprint = Blueprint('slack_router', __name__)
 
@@ -48,8 +49,7 @@ def oauth_redirect():
     if 'ok' in data:
         if data['ok'] and 'token_type' in data and data['token_type'] == 'bot' and 'team' in data:
             try:
-                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-
+                current_datetime = get_current_datetime()
                 team_id = data['team']['id']
                 team_name = data['team']['name']
                 bot_oauth_token = data['access_token']
@@ -59,7 +59,7 @@ def oauth_redirect():
                     if PUSH_TO_S3:
                         data_to_upload = slack_workspace.to_dict()
                         json_data = json.dumps(data_to_upload)
-                        key = f'{team_id}-{team_name}-{current_time}.json'
+                        key = f'{team_id}-{team_name}-{current_datetime}.json'
                         publish_json_blob_to_s3(key, METADATA_S3_BUCKET_NAME, json_data)
                     if PUSH_TO_SLACK:
                         message_text = f"Registered workspace_id : {team_id}, workspace_name: {team_name} " \
@@ -123,10 +123,10 @@ def bot_mention():
                                                                                user)
                         if slack_bot_config and is_created:
                             if PUSH_TO_S3:
-                                current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                                current_datetime = get_current_datetime()
                                 data_to_upload = slack_bot_config.to_dict()
                                 json_data = json.dumps(data_to_upload)
-                                key = f'{team_id}-{channel_id}-{current_time}.json'
+                                key = f'{team_id}-{channel_id}-{current_datetime}.json'
                                 publish_json_blob_to_s3(key, METADATA_S3_BUCKET_NAME, json_data)
                             if PUSH_TO_SLACK:
                                 message_text = "Registered channel for workspace_id : " + team_id + " " + "channel_id: " + \
