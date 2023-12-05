@@ -3,16 +3,19 @@ SLACK_CLIENT_ID = 'your_client_id'
 SLACK_CLIENT_SECRET = 'your_client_secret'
 SLACK_REDIRECT_URI = 'your_redirect_uri'
 
-# Replace 'YOUR_SLACK_VERIFICATION_TOKEN' with your Slack app's verification token
-SLACK_VERIFICATION_TOKEN = 'your_verification_token'
-
-PUSH_TO_LOCAL_DB = False
-
+# AWS S3 Credentials
 PUSH_TO_S3 = True
 AWS_ACCESS_KEY = 'your_aws_access_key'
 AWS_SECRET_KEY = 'your_aws_secret_key'
 METADATA_S3_BUCKET_NAME = 'your_metadata_s3_bucket_name'
 RAW_DATA_S3_BUCKET_NAME = 'your_raw_data_s3_bucket_name'
 
+# Slack Notification Credentials
 PUSH_TO_SLACK = True
 SLACK_URL = 'your_slack_webhook_url'
+
+# Postgres DB Credentials
+PG_DB_HOSTNAME = 'localhost'
+PG_DB_USERNAME = ''
+PG_DB_PASSWORD = ''
+PG_DB_NAME = 'data_scrapper_db'

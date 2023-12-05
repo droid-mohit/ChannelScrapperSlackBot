@@ -1,9 +1,12 @@
 import json
+import logging
 
 import boto3
 import requests
 
-from env_vars import SLACK_URL, AWS_ACCESS_KEY, AWS_SECRET_KEY, METADATA_S3_BUCKET_NAME
+from env_vars import SLACK_URL, AWS_ACCESS_KEY, AWS_SECRET_KEY
+
+logger = logging.getLogger(__name__)
 
 s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
@@ -18,7 +21,7 @@ def publish_message_to_slack(message_text):
     }
     try:
         response = requests.request("POST", url, headers=headers, data=payload)
-        print(response.json())
+        logger.info(f"Response from slack: {response.status_code}:{response.text}")
     except Exception as e:
         print(f"Exception occurred while publishing message to slack with error: {e}")
 

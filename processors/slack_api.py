@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from http.client import IncompleteRead
@@ -10,102 +11,113 @@ from slack_sdk import WebClient
 from env_vars import RAW_DATA_S3_BUCKET_NAME
 from utils.publishsing_client import publish_object_file_to_s3
 
-
-def fetch_channel_info(bot_auth_token, channel_id):
-    try:
-        client = WebClient(token=bot_auth_token)
-        response = client.conversations_info(channel=channel_id)
-        if response:
-            if 'ok' in response and response['ok']:
-                channel_info = response['channel']
-                return channel_info
-    except Exception as e:
-        print(f"Exception occurred while fetching channel info for channel_id: {channel_id} with error: {e}")
-    return None
+logger = logging.getLogger(__name__)
 
 
-def fetch_conversation_history(bot_auth_token, channel_id, latest_timestamp=None, oldest_timestamp=None):
-    print(f"Initiating Bulk Extraction for channel_id: {channel_id}")
-    channel_info = fetch_channel_info(bot_auth_token, channel_id)
-    raw_data = pd.DataFrame(columns=["uuid", "full_message"])
-    message_counter = 0
-    if not latest_timestamp:
-        latest_timestamp = str(time.time())
-    visit_next_cursor = True
-    next_cursor = None
-    try:
-        client = WebClient(token=bot_auth_token)
-        while visit_next_cursor:
-            try:
-                if oldest_timestamp:
-                    response_paginated = client.conversations_history(channel=channel_id, cursor=next_cursor,
-                                                                      latest=latest_timestamp,
-                                                                      oldest=oldest_timestamp, limit=100, timeout=300)
-                else:
-                    response_paginated = client.conversations_history(channel=channel_id, cursor=next_cursor,
-                                                                      latest=latest_timestamp, limit=100, timeout=300)
-            except IncompleteRead as e:
-                print(f"IncompleteRead occurred while fetching conversation history for channel_id: {channel_id} "
-                      f"with error: {e}")
-                continue
-            except Exception as e:
-                print(
-                    f"Exception occurred while fetching conversation history for channel_id: {channel_id} with error: {e}")
-                continue
-            if not response_paginated:
-                break
-            if 'messages' in response_paginated:
-                messages = response_paginated["messages"]
-                if not messages or len(messages) <= 0:
-                    break
-                new_timestamp = response_paginated["messages"][0]['ts']
-                if new_timestamp >= latest_timestamp:
-                    break
-                for message in response_paginated["messages"]:
-                    temp = pd.DataFrame([{"full_message": message, "uuid": message.get('ts')}])
-                    raw_data = pd.concat([temp, raw_data])
-                    message_counter = message_counter + 1
-                print(message_counter, " messages published.")
-                print("Extracted Data till", datetime.fromtimestamp(float(new_timestamp)))
-            if 'response_metadata' in response_paginated and 'next_cursor' in response_paginated['response_metadata']:
-                next_cursor = response_paginated['response_metadata']['next_cursor']
-                time.sleep(1.5)
-            else:
-                visit_next_cursor = False
-    except Exception as e:
-        print(f"Exception occurred while fetching conversation history for channel_id: {channel_id} with error: {e}")
+class SlackApiProcessor:
+    client = None
+
+    def __init__(self, bot_auth_token):
+        self.__bot_auth_token = bot_auth_token
+        self.client = WebClient(token=self.__bot_auth_token)
+
+    def fetch_channel_info(self, channel_id):
+        try:
+            response = self.client.conversations_info(channel=channel_id)
+            if response:
+                if 'ok' in response and response['ok']:
+                    channel_info = response['channel']
+                    return channel_info
+        except Exception as e:
+            logger.error(f"Exception occurred while fetching channel info for channel_id: {channel_id} with error: {e}")
         return None
 
-    if raw_data.shape[0] > 0:
-        raw_data = raw_data.reset_index(drop=True)
-        raw_data = raw_data.sort_values(by=['uuid'])
-        raw_data = raw_data.reset_index(drop=True)
-        duplicates = raw_data[raw_data.duplicated(subset='uuid', keep=False)]
-        if duplicates.shape[0] > 0:
-            print(f"Handling {duplicates.shape[0]} duplicate messages for channel_id: {channel_id}")
-            raw_data = raw_data.drop_duplicates(subset='uuid', keep='last')
-
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        latest_datetime = datetime.fromtimestamp(float(latest_timestamp))
-        if channel_info:
-            channel_name = channel_info['name']
-            team_id = channel_info['context_team_id']
-            csv_file_name = f"{team_id}-{channel_id}-{channel_name}-{latest_datetime}-raw_data.csv"
-        else:
-            csv_file_name = f"{channel_id}-{latest_datetime}-raw_data.csv"
-        file_path = os.path.join(base_dir, csv_file_name)
-
-        raw_data.to_csv(file_path, index=False)
-        publish_object_file_to_s3(file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
-        print(f"Successfully extracted {message_counter} messages for channel_id: {channel_id}")
+    def fetch_conversation_history(self, channel_id, latest_timestamp=None, oldest_timestamp=None):
+        logger.info(f"Initiating Bulk Extraction for channel_id: {channel_id}")
+        channel_info = self.fetch_channel_info(channel_id)
+        raw_data = pd.DataFrame(columns=["uuid", "full_message"])
+        message_counter = 0
+        if not latest_timestamp:
+            latest_timestamp = str(time.time())
+        visit_next_cursor = True
+        next_cursor = None
         try:
-            os.remove(file_path)
-            print(f"File '{file_path}' deleted successfully.")
-        except FileNotFoundError:
-            print(f"File '{file_path}' not found.")
-        except PermissionError:
-            print(f"Permission error. You may not have the necessary permissions to delete the file.")
+            while visit_next_cursor:
+                try:
+                    if oldest_timestamp:
+                        response_paginated = self.client.conversations_history(channel=channel_id, cursor=next_cursor,
+                                                                               latest=latest_timestamp,
+                                                                               oldest=oldest_timestamp, limit=100,
+                                                                               timeout=300)
+                    else:
+                        response_paginated = self.client.conversations_history(channel=channel_id, cursor=next_cursor,
+                                                                               latest=latest_timestamp, limit=100,
+                                                                               timeout=300)
+                except IncompleteRead as e:
+                    logger.error(
+                        f"IncompleteRead occurred while fetching conversation history for channel_id: {channel_id} "
+                        f"with error: {e}")
+                    continue
+                except Exception as e:
+                    logger.error(
+                        f"Exception occurred while fetching conversation history for channel_id: {channel_id} with error: {e}")
+                    continue
+                if not response_paginated:
+                    break
+                if 'messages' in response_paginated:
+                    messages = response_paginated["messages"]
+                    if not messages or len(messages) <= 0:
+                        break
+                    new_timestamp = response_paginated["messages"][0]['ts']
+                    if new_timestamp >= latest_timestamp:
+                        break
+                    for message in response_paginated["messages"]:
+                        temp = pd.DataFrame([{"full_message": message, "uuid": message.get('ts')}])
+                        raw_data = pd.concat([temp, raw_data])
+                        message_counter = message_counter + 1
+                    logger.info(message_counter, " messages published.")
+                    logger.info("Extracted Data till", datetime.fromtimestamp(float(new_timestamp)))
+                if 'response_metadata' in response_paginated and 'next_cursor' in response_paginated[
+                    'response_metadata']:
+                    next_cursor = response_paginated['response_metadata']['next_cursor']
+                    time.sleep(1.5)
+                else:
+                    visit_next_cursor = False
         except Exception as e:
-            print(f"An error occurred: {e}")
-    else:
-        print(f"Exception occurred ot No messages found for channel_id: {channel_id}")
+            logger.error(
+                f"Exception occurred while fetching conversation history for channel_id: {channel_id} with error: {e}")
+            return None
+
+        if raw_data.shape[0] > 0:
+            raw_data = raw_data.reset_index(drop=True)
+            raw_data = raw_data.sort_values(by=['uuid'])
+            raw_data = raw_data.reset_index(drop=True)
+            duplicates = raw_data[raw_data.duplicated(subset='uuid', keep=False)]
+            if duplicates.shape[0] > 0:
+                logger.info(f"Handling {duplicates.shape[0]} duplicate messages for channel_id: {channel_id}")
+                raw_data = raw_data.drop_duplicates(subset='uuid', keep='last')
+
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            latest_datetime = datetime.fromtimestamp(float(latest_timestamp))
+            if channel_info:
+                channel_name = channel_info['name']
+                team_id = channel_info['context_team_id']
+                csv_file_name = f"{team_id}-{channel_id}-{channel_name}-{latest_datetime}-raw_data.csv"
+            else:
+                csv_file_name = f"{channel_id}-{latest_datetime}-raw_data.csv"
+            file_path = os.path.join(base_dir, csv_file_name)
+
+            raw_data.to_csv(file_path, index=False)
+            publish_object_file_to_s3(file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
+            logger.info(f"Successfully extracted {message_counter} messages for channel_id: {channel_id}")
+            try:
+                os.remove(file_path)
+                logger.error(f"File '{file_path}' deleted successfully.")
+            except FileNotFoundError:
+                logger.error(f"File '{file_path}' not found.")
+            except PermissionError:
+                logger.error(f"Permission error. You may not have the necessary permissions to delete the file.")
+            except Exception as e:
+                logger.error(f"An error occurred: {e}")
+        else:
+            logger.error(f"Exception occurred ot No messages found for channel_id: {channel_id}")
