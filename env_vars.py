@@ -1,4 +1,5 @@
 # Replace these with your app's information
+SLACK_APP_ID = 'your_app_id'
 SLACK_CLIENT_ID = 'your_client_id'
 SLACK_CLIENT_SECRET = 'your_client_secret'
 SLACK_REDIRECT_URI = 'your_redirect_uri'
