@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Dict
 
-from env_vars import PUSH_TO_S3, METADATA_S3_BUCKET_NAME, PUSH_TO_SLACK
+from env_vars import PUSH_TO_S3, METADATA_S3_BUCKET_NAME, PUSH_TO_SLACK, SLACK_APP_ID
 from persistance.db_utils import get_slack_workspace_config_by, create_slack_bot_config, create_slack_workspace_config, \
     get_slack_bot_configs_by, update_slack_bot_config, update_slack_workspace_config
 from processors.slack_webclient_apis import SlackApiProcessor
@@ -48,7 +48,6 @@ def handle_oauth_callback(data: Dict):
 
 
 def handle_event_callback(data: Dict):
-    print(data)
     if 'team_id' not in data or 'event' not in data:
         logger.error(f"Error handling slack event callback api, team_id or event not found in request data: {data}")
         return False
@@ -72,7 +71,7 @@ def handle_event_callback(data: Dict):
                     if bot_user_id in text:
                         user = bot_user_id
                         break
-        if event_type != 'app_uninstalled' and user not in bot_user_ids:
+        if (event_type != 'app_uninstalled' and event_type != 'channel_left') and user not in bot_user_ids:
             logger.error(f"Error handling {event_type} event type for workspace {team_id}: {user} is not bot user")
             return False
         channel_id = event.get('channel', None)
@@ -154,6 +153,24 @@ def handle_event_callback(data: Dict):
             except Exception as e:
                 logger.error(f"Error while de-registering slack bot with error: {e}")
                 return False
+        elif event_type == 'channel_left':
+            if 'api_app_id' in data and data['api_app_id'] == SLACK_APP_ID:
+                for active_slack_workspace in active_slack_workspaces:
+                    active_slack_bots = get_slack_bot_configs_by(active_slack_workspace.id, channel_id, is_active=True)
+                    for slack_bot in active_slack_bots:
+                        updated_slack_bot_config = update_slack_bot_config(slack_bot, is_active=False)
+                        if updated_slack_bot_config:
+                            workspace_header = active_slack_workspace.team_id
+                            if active_slack_workspace.team_name:
+                                workspace_header = active_slack_workspace.team_name
+                            channel_header = channel_id
+                            if updated_slack_bot_config.channel_name:
+                                channel_header = updated_slack_bot_config.channel_name
+                            if PUSH_TO_SLACK:
+                                message_text = "De-Registered channel for workspace: " + "*" + workspace_header + "*" \
+                                               + " " + "channel: " + "*" + channel_header + "*" + " " + \
+                                               " at event_ts: " + event_ts
+                                publish_message_to_slack(message_text)
         elif event_type == 'app_uninstalled':
             try:
                 for slack_workspace in active_slack_workspaces:
