@@ -1,5 +1,5 @@
 from celery_app import celery
-from processors.slack_api import SlackApiProcessor
+from processors.slack_webclient_apis import SlackApiProcessor
 from utils.time_utils import get_current_time
 
 

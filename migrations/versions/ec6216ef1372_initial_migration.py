@@ -1,8 +1,8 @@
 """initial migration
 
-Revision ID: cc1b89ee2bdc
+Revision ID: ec6216ef1372
 Revises: 
-Create Date: 2023-12-05 13:03:19.968257
+Create Date: 2023-12-05 20:36:19.524970
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'cc1b89ee2bdc'
+revision = 'ec6216ef1372'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -22,23 +22,26 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('team_id', sa.String(length=255), nullable=False),
     sa.Column('team_name', sa.String(length=255), nullable=False),
+    sa.Column('bot_user_id', sa.String(length=255), nullable=False),
     sa.Column('bot_auth_token', sa.String(length=255), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('team_id')
+    sa.UniqueConstraint('team_id', 'bot_user_id', 'bot_auth_token')
     )
     op.create_table('slack_bot_config',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('slack_workspace_id', sa.Integer(), nullable=False),
     sa.Column('channel_id', sa.String(length=255), nullable=False),
-    sa.Column('channel_name', sa.String(length=255), nullable=False),
-    sa.Column('user_id', sa.String(length=255), nullable=False),
     sa.Column('event_ts', sa.String(length=255), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('channel_name', sa.String(length=255), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['slack_workspace_id'], ['slack_workspace_config.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('slack_workspace_id', 'channel_id')
     )
     # ### end Alembic commands ###
 
