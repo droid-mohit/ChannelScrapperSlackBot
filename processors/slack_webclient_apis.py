@@ -68,6 +68,8 @@ class SlackApiProcessor:
                     new_timestamp = response_paginated["messages"][0]['ts']
                     if new_timestamp >= latest_timestamp:
                         break
+                    if oldest_timestamp and new_timestamp <= oldest_timestamp:
+                        break
                     for message in response_paginated["messages"]:
                         temp = pd.DataFrame([{"full_message": message, "uuid": message.get('ts')}])
                         raw_data = pd.concat([temp, raw_data])

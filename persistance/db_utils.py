@@ -1,6 +1,6 @@
 import logging
 
-from persistance.models import db, SlackWorkspaceConfig, SlackBotConfig
+from persistance.models import db, SlackWorkspaceConfig, SlackBotConfig, SlackChannelDataScrapingSchedule
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def update_slack_workspace_config(slack_workspace_config: SlackWorkspaceConfig, 
 
 def get_slack_bot_configs_by(slack_workspace_id: str = None, channel_id: str = None, is_active: bool = None):
     """
-    Fetch a SlackBotConfig row based on the bot_config_id.
+    Fetch a SlackBotConfig row based on different options.
     """
     filters = {}
     if slack_workspace_id:
@@ -144,3 +144,36 @@ def update_slack_bot_config(slack_bot_config: SlackBotConfig, event_ts: str = No
         logger.error(f"Error while updating SlackBotConfig: {slack_bot_config.id} with error: {e}")
         db.session.rollback()
         return None
+
+
+def create_slack_channel_scrap_schedule(slack_channel_id, data_extraction_from, data_extraction_to):
+    """
+    Create a new SlackChannelDataScrapSchedule instance and add it to the database.
+    """
+    try:
+        new_slack_data_scrap_schedule = SlackChannelDataScrapingSchedule(
+            slack_channel_id=slack_channel_id,
+            data_extraction_from=data_extraction_from,
+            data_extraction_to=data_extraction_to,
+        )
+
+        db.session.add(new_slack_data_scrap_schedule)
+        db.session.commit()
+        return new_slack_data_scrap_schedule, True
+    except Exception as e:
+        logger.error(
+            f"Error while saving SlackChannelDataScrapSchedule: "
+            f":{slack_channel_id}:{data_extraction_from}:{data_extraction_to} with error: {e}")
+        db.session.rollback()
+        return None, False
+
+
+def get_last_slack_channel_scrap_schedule_for(slack_channel_id):
+    """
+    Fetch a SlackBotConfig row based slack_workspace_id and slack_channel_id.
+    """
+    filters = {}
+    if slack_channel_id:
+        filters['slack_channel_id'] = slack_channel_id
+    return SlackChannelDataScrapingSchedule.query.filter_by(**filters).order_by(
+        SlackChannelDataScrapingSchedule.triggered_at.desc()).first()

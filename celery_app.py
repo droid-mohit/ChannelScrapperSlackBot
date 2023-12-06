@@ -15,7 +15,6 @@ migrate = Migrate(app, db)
 
 # Celery configuration
 app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
-app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
 celery = Celery(
     app.name,  # Replace with your Flask app name
     broker=app.config['CELERY_BROKER_URL'],  # Use Redis as the message broker

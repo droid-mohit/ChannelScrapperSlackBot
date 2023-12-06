@@ -54,3 +54,21 @@ class SlackBotConfig(db.Model):
         if self.channel_name:
             return f'<Slack Bot {self.slack_workspace.team_id}:{self.channel_name}>'
         return f'<Slack Bot {self.workspace}:{self.channel_id}>'
+
+
+class SlackChannelDataScrapingSchedule(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    slack_channel_id = db.Column(db.Integer, db.ForeignKey('slack_bot_config.id'), nullable=False)
+    slack_channel = db.relationship('SlackBotConfig', backref='channel_configs')
+
+    data_extraction_from = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    data_extraction_to = db.Column(db.DateTime, default=datetime.utcnow)
+
+    triggered_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('slack_channel_id', 'data_extraction_from', 'data_extraction_to'),)
+
+    def __repr__(self):
+        return f'<Schedule: {self.slack_channel_id}:{self.data_extraction_from}:{self.data_extraction_to}>'
