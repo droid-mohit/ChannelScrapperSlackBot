@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def install():
     # Redirect users to Slack's OAuth URL
     return redirect(
-        f'https://slack.com/oauth/v2/authorize?client_id={SLACK_CLIENT_ID}&scope=commands,app_mentions:read,channels:history,channels:read,chat:write,groups:read,mpim:read,users:read&user_scope=channels:history&redirect_uri={SLACK_REDIRECT_URI}')
+        f'https://slack.com/oauth/v2/authorize?client_id={SLACK_CLIENT_ID}&scope=app_mentions:read,channels:history,channels:read,chat:write,commands,groups:read,mpim:read,users:read,groups:history&user_scope=channels:history,channels:read,groups:read&redirect_uri={SLACK_REDIRECT_URI}')
 
 
 @slack_blueprint.route('/oauth_redirect', methods=['GET'])
