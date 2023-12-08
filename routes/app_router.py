@@ -1,6 +1,7 @@
 from flask import request
-from jobs.tasks import data_fetch_job
 from flask import jsonify, Blueprint
+
+from processors.slack_webclient_apis import SlackApiProcessor
 
 app_blueprint = Blueprint('app_router', __name__)
 
@@ -15,5 +16,6 @@ def health_check():
 def start_data_fetch():
     channel_id = request.args.get('channel')
     bot_auth_token = request.args.get('token')
-    data_fetch_job.delay(bot_auth_token, channel_id)
+    slack_api_processor = SlackApiProcessor(bot_auth_token)
+    slack_api_processor.fetch_conversation_history(channel_id)
     return jsonify({'success': True})
