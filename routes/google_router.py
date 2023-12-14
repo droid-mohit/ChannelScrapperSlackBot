@@ -76,6 +76,15 @@ def get_chats_request():
     df.to_csv(csv_file_path, index=False)
     if PUSH_TO_S3:
         publish_object_file_to_s3(csv_file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
+        try:
+            os.remove(csv_file_path)
+            logger.error(f"File '{csv_file_path}' deleted successfully.")
+        except FileNotFoundError:
+            logger.error(f"File '{csv_file_path}' not found.")
+        except PermissionError:
+            logger.error(f"Permission error. You may not have the necessary permissions to delete the file.")
+        except Exception as e:
+            logger.error(f"An error occurred: {e}")
     # Save credentials back to session in case access token was refreshed.
     # ACTION ITEM: In a production app, you likely want to save these
     #              credentials in a persistent database instead.
