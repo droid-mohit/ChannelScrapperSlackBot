@@ -7,9 +7,9 @@ It is a Flask + Celery Project
 Flask Migrate Commands:
 
 ```
-flask db init
-flask db migrate
-flask db upgrade
+python -m flask db init
+python -m flask db migrate
+python -m  flask db upgrade
 ```
 
 Run Flask service:

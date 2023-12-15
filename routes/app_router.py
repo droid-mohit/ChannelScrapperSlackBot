@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from flask import request
@@ -5,6 +6,7 @@ from flask import jsonify, Blueprint
 
 from persistance.db_utils import create_slack_channel_scrap_schedule, get_slack_bot_configs_by
 from processors.slack_webclient_apis import SlackApiProcessor
+from route_handlers.app_route_handler import handler_source_token_registration
 from utils.time_utils import get_current_time
 
 app_blueprint = Blueprint('app_router', __name__)
@@ -65,19 +67,18 @@ def get_channel_info():
     return jsonify({'success': False, 'message': 'Failed to fetch channel info'})
 
 
-@app_blueprint.route('/register_source_token', methods=['GET'])
+@app_blueprint.route('/register_source_token', methods=['POST'])
 def register_source_token():
-    channel_id = request.args.get('channel')
-    bot_auth_token = request.args.get('token')
-    if not channel_id or not bot_auth_token:
-        return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+    request_data = request.data.decode('utf-8')
+    if request_data:
+        data = json.loads(request_data)
+        if 'user_email' not in data or 'source' not in data or 'token_config' not in data:
+            return jsonify({'success': False, 'message': 'Invalid arguments provided'})
 
-    slack_bot_configs = get_slack_bot_configs_by(channel_id=channel_id, is_active=True)
-    if not slack_bot_configs:
-        return jsonify({'success': False, 'message': 'No active slack bot configs found for channel_id: {channel_id}'})
-
-    slack_api_processor = SlackApiProcessor(bot_auth_token)
-    channel_info = slack_api_processor.fetch_channel_info(channel_id)
-    if channel_info:
-        return jsonify(**channel_info)
-    return jsonify({'success': False, 'message': 'Failed to fetch channel info'})
+        user_email = data['user_email']
+        source = data['source']
+        token_config = data['token_config']
+        saved_token_config = handler_source_token_registration(user_email, source, token_config)
+        if not saved_token_config:
+            return jsonify({'success': False, 'message': 'Failed to register token config'})
+        return jsonify({'success': True, 'message': 'Token config registered successfully'})
