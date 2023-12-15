@@ -4,7 +4,9 @@ from datetime import datetime
 from flask import request
 from flask import jsonify, Blueprint
 
-from persistance.db_utils import create_slack_channel_scrap_schedule, get_slack_bot_configs_by
+from persistance.db_utils import create_slack_channel_scrap_schedule, get_slack_bot_configs_by, \
+    get_source_token_config_by
+from processors.sentry_client_apis import SentryApiProcessor
 from processors.slack_webclient_apis import SlackApiProcessor
 from route_handlers.app_route_handler import handler_source_token_registration
 from utils.time_utils import get_current_time
@@ -82,3 +84,31 @@ def register_source_token():
         if not saved_token_config:
             return jsonify({'success': False, 'message': 'Failed to register token config'})
         return jsonify({'success': True, 'message': 'Token config registered successfully'})
+
+
+@app_blueprint.route('/sentry/start_data_fetch', methods=['GET'])
+def sentry_start_data_fetch():
+    project_slug = request.args.get('project')
+    user_email = request.args.get('user_email')
+    if not project_slug or not user_email:
+        return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+    source_tokens = get_source_token_config_by(user_email, 'SENTRY', is_active=True)
+    if not source_tokens:
+        return jsonify(
+            {'success': False, 'message': f'No active source token configs found for user_email: {user_email}'})
+
+    source_token = source_tokens[0]
+    latest_timestamp = request.args.get('latest_timestamp')
+    if not latest_timestamp:
+        latest_timestamp = str(get_current_time())
+
+    oldest_timestamp = request.args.get('oldest_timestamp')
+    if not oldest_timestamp:
+        oldest_timestamp = ''
+
+    sentry_api_processor = SentryApiProcessor(source_token.token_config['bearer_token'],
+                                              source_token.token_config['organization_slug'], project_slug)
+    data_fetch_success = sentry_api_processor.fetch_events(latest_timestamp, oldest_timestamp)
+    if data_fetch_success:
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'message': 'Failed to fetch events'})
