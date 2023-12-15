@@ -113,8 +113,8 @@ def handle_event_callback(data: Dict):
                             publish_json_blob_to_s3(key, METADATA_S3_BUCKET_NAME, json_data)
                         if PUSH_TO_SLACK:
                             message_text = "Registered channel for slack workspace: " + "*" + workspace_header + "*" \
-                                           + " " + "channel: " + "*" + channel_header + "*" + " at " + "event_ts: " \
-                                           + event_ts
+                                           + " " + "channel: " + "*" + channel_header + " and channel id: " + "*" + \
+                                           channel_id + "*" + " at " + "event_ts: " + event_ts
                             publish_message_to_slack(message_text)
                     return True
                 else:
@@ -181,16 +181,11 @@ def handle_event_callback(data: Dict):
                             workspace_header = updated_slack_workspace.team_name
                         active_slack_bots = get_slack_bot_configs_by(updated_slack_workspace.id, is_active=True)
                         for slack_bot in active_slack_bots:
-                            updated_slack_bot_config = update_slack_bot_config(slack_bot, is_active=False)
-                            if updated_slack_bot_config:
-                                channel_header = updated_slack_bot_config.channel_id
-                                if updated_slack_bot_config.channel_name:
-                                    channel_header = updated_slack_bot_config.channel_name
-                                if PUSH_TO_SLACK:
-                                    message_text = "De-Registered slack app from workspace: " + "*" + \
-                                                   workspace_header + "*" + " " + "channel: " + "*" + \
-                                                   channel_header + "*" + " " + " at event_ts: " + event_ts
-                                    publish_message_to_slack(message_text)
+                            update_slack_bot_config(slack_bot, is_active=False)
+                        if PUSH_TO_SLACK:
+                            message_text = "De-Registered slack app from workspace: " + "*" + \
+                                           workspace_header + "*" + " " + " at event_ts: " + event_ts
+                            publish_message_to_slack(message_text)
                 return True
             except Exception as e:
                 logger.error(f"Error while de-registering slack app in workspace: {team_id} with error: {e}")
