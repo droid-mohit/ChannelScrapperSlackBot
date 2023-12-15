@@ -1,9 +1,14 @@
+import sys
+
 from celery import Celery
 from flask import Flask
 from flask_migrate import Migrate
 
 from env_vars import PG_DB_USERNAME, PG_DB_PASSWORD, PG_DB_NAME, PG_DB_HOSTNAME
 from persistance.models import db
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.absolute()))
 
 app = Flask(__name__)
 

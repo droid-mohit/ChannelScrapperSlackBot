@@ -8,7 +8,7 @@ from datetime import datetime
 
 from slack_sdk import WebClient
 
-from env_vars import RAW_DATA_S3_BUCKET_NAME
+from env_vars import RAW_DATA_S3_BUCKET_NAME, PUSH_TO_S3
 from utils.publishsing_client import publish_object_file_to_s3
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,10 @@ class SlackApiProcessor:
             logger.error(f"Exception occurred while fetching channel info for channel_id: {channel_id} with error: {e}")
         return None
 
-    def fetch_conversation_history(self, channel_id, latest_timestamp=None, oldest_timestamp=None):
+    def fetch_conversation_history(self, channel_id: str, latest_timestamp: str, oldest_timestamp: str):
+        if not channel_id or not latest_timestamp or not oldest_timestamp:
+            logger.error(f"Invalid arguments provided for fetch_conversation_history")
+            return False
         channel_info = self.fetch_channel_info(channel_id)
         raw_data = pd.DataFrame(columns=["uuid", "full_message"])
         message_counter = 0
@@ -41,7 +44,7 @@ class SlackApiProcessor:
         try:
             while visit_next_cursor:
                 try:
-                    if oldest_timestamp:
+                    if oldest_timestamp is not None and oldest_timestamp != '':
                         response_paginated = self.client.conversations_history(channel=channel_id, cursor=next_cursor,
                                                                                latest=latest_timestamp,
                                                                                oldest=oldest_timestamp, limit=100,
@@ -66,9 +69,10 @@ class SlackApiProcessor:
                     if not messages or len(messages) <= 0:
                         break
                     new_timestamp = response_paginated["messages"][0]['ts']
-                    if new_timestamp >= latest_timestamp:
+                    print(f"new_timestamp: {new_timestamp}")
+                    if float(new_timestamp) >= float(latest_timestamp):
                         break
-                    if oldest_timestamp and new_timestamp <= oldest_timestamp:
+                    if oldest_timestamp and float(new_timestamp) <= float(oldest_timestamp):
                         break
                     for message in response_paginated["messages"]:
                         temp = pd.DataFrame([{"full_message": message, "uuid": message.get('ts')}])
@@ -79,13 +83,14 @@ class SlackApiProcessor:
                 if 'response_metadata' in response_paginated and \
                         'next_cursor' in response_paginated['response_metadata']:
                     next_cursor = response_paginated['response_metadata']['next_cursor']
-                    time.sleep(1.5)
+                    time.sleep(0.5)
                 else:
                     visit_next_cursor = False
+                    break
         except Exception as e:
             logger.error(
                 f"Exception occurred while fetching conversation history for channel_id: {channel_id} with error: {e}")
-            return None
+            return False
 
         if raw_data.shape[0] > 0:
             raw_data = raw_data.reset_index(drop=True)
@@ -107,16 +112,20 @@ class SlackApiProcessor:
             file_path = os.path.join(base_dir, csv_file_name)
 
             raw_data.to_csv(file_path, index=False)
-            publish_object_file_to_s3(file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
-            logger.info(f"Successfully extracted {message_counter} messages for channel_id: {channel_id}")
-            try:
-                os.remove(file_path)
-                logger.error(f"File '{file_path}' deleted successfully.")
-            except FileNotFoundError:
-                logger.error(f"File '{file_path}' not found.")
-            except PermissionError:
-                logger.error(f"Permission error. You may not have the necessary permissions to delete the file.")
-            except Exception as e:
-                logger.error(f"An error occurred: {e}")
+            if PUSH_TO_S3:
+                publish_object_file_to_s3(file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
+                logger.info(f"Successfully extracted {message_counter} messages for channel_id: {channel_id}")
+                try:
+                    os.remove(file_path)
+                    logger.error(f"File '{file_path}' deleted successfully.")
+                except FileNotFoundError:
+                    logger.error(f"File '{file_path}' not found.")
+                except PermissionError:
+                    logger.error(f"Permission error. You may not have the necessary permissions to delete the file.")
+                except Exception as e:
+                    logger.error(f"An error occurred: {e}")
         else:
-            logger.error(f"Exception occurred ot No messages found for channel_id: {channel_id}")
+            logger.error(
+                f"No new messages found for channel_id: {channel_id} between {latest_timestamp} and {oldest_timestamp}")
+            return False
+        return True
