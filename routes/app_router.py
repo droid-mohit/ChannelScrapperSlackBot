@@ -34,7 +34,7 @@ def start_data_fetch():
 
     oldest_timestamp = request.args.get('oldest_timestamp')
     if not oldest_timestamp:
-        oldest_timestamp = None
+        oldest_timestamp = ''
 
     slack_api_processor = SlackApiProcessor(bot_auth_token)
     slack_api_processor.fetch_conversation_history(channel_id, latest_timestamp, oldest_timestamp)

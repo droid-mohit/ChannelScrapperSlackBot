@@ -33,7 +33,7 @@ class SlackApiProcessor:
         return None
 
     def fetch_conversation_history(self, channel_id: str, latest_timestamp: str, oldest_timestamp: str):
-        if not channel_id or not latest_timestamp or not oldest_timestamp:
+        if not channel_id or not latest_timestamp or oldest_timestamp is None:
             logger.error(f"Invalid arguments provided for fetch_conversation_history")
             return False
         channel_info = self.fetch_channel_info(channel_id)
@@ -69,7 +69,6 @@ class SlackApiProcessor:
                     if not messages or len(messages) <= 0:
                         break
                     new_timestamp = response_paginated["messages"][0]['ts']
-                    print(f"new_timestamp: {new_timestamp}")
                     if float(new_timestamp) >= float(latest_timestamp):
                         break
                     if oldest_timestamp and float(new_timestamp) <= float(oldest_timestamp):
