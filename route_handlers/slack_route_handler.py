@@ -113,8 +113,8 @@ def handle_event_callback(data: Dict):
                             publish_json_blob_to_s3(key, METADATA_S3_BUCKET_NAME, json_data)
                         if PUSH_TO_SLACK:
                             message_text = "Registered channel for slack workspace: " + "*" + workspace_header + "*" \
-                                           + " " + "channel: " + "*" + channel_header + "*" + " at " + "event_ts: " \
-                                           + event_ts
+                                           + " " + "channel: " + "*" + channel_header + " and channel id: " + "*" + \
+                                           channel_id + "*" + " at " + "event_ts: " + event_ts
                             publish_message_to_slack(message_text)
                     return True
                 else:
