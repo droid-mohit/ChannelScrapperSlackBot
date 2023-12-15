@@ -2,7 +2,6 @@ import sys
 
 from celery import Celery
 from flask import Flask
-from flask_migrate import Migrate
 
 from env_vars import PG_DB_USERNAME, PG_DB_PASSWORD, PG_DB_NAME, PG_DB_HOSTNAME
 from persistance.models import db
@@ -16,7 +15,6 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{PG_DB_USERNAME}:{PG_DB_PASSWORD}@{PG_DB_HOSTNAME}/{PG_DB_NAME}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
-migrate = Migrate(app, db)
 
 # Celery configuration
 app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'

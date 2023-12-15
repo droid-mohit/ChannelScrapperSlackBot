@@ -72,3 +72,24 @@ class SlackChannelDataScrapingSchedule(db.Model):
 
     def __repr__(self):
         return f'<Schedule: {self.slack_channel_id}:{self.data_extraction_from}:{self.data_extraction_to}>'
+
+
+class SourceTokenRepository(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_email = db.Column(db.String(255), nullable=False)
+    source = db.Column(db.String(255), nullable=False)
+    token_config = db.Column(db.JSON, nullable=False)
+    token_config_md5 = db.Column(db.String(255), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+    __table_args__ = (db.UniqueConstraint('user_email', 'source', 'token_config_md5'),)
+
+    def to_dict(self):
+        return {'id': self.id, 'user_email': self.user_email, 'source': self.source,
+                'token_config': self.token_config, 'created_at': str(self.created_at)}
+
+    def __repr__(self):
+        return f'<Token Config {self.id}:{self.user_email}:{self.source}:>'

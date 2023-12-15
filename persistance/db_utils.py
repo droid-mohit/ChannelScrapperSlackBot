@@ -1,6 +1,9 @@
+import hashlib
+import json
 import logging
 
-from persistance.models import db, SlackWorkspaceConfig, SlackBotConfig, SlackChannelDataScrapingSchedule
+from persistance.models import db, SlackWorkspaceConfig, SlackBotConfig, SlackChannelDataScrapingSchedule, \
+    SourceTokenRepository
 
 logger = logging.getLogger(__name__)
 
@@ -177,3 +180,74 @@ def get_last_slack_channel_scrap_schedule_for(slack_channel_id):
         filters['slack_channel_id'] = slack_channel_id
     return SlackChannelDataScrapingSchedule.query.filter_by(**filters).order_by(
         SlackChannelDataScrapingSchedule.triggered_at.desc()).first()
+
+
+def get_source_token_config_by(user_email: str = None, source: str = None, token_config_md5: str = None,
+                               is_active: bool = None):
+    """
+    Fetch a SourceTokenRepository row based on different options.
+    """
+    filters = {}
+    if user_email:
+        filters['user_email'] = user_email
+    if source:
+        filters['source'] = source
+    if token_config_md5:
+        filters['token_config_md5'] = token_config_md5
+    if is_active is not None:
+        filters['is_active'] = is_active
+
+    return SourceTokenRepository.query.filter_by(**filters).all()
+
+
+def update_source_token_config(source_token_config: SourceTokenRepository, is_active: bool = None):
+    """
+    Update an existing SourceTokenRepository instance in the database.
+    """
+    try:
+        if not source_token_config:
+            logger.error(f"Error while updating SourceTokenRepository with error: source_token_config is None")
+            return None
+        if is_active is not None:
+            source_token_config.is_active = is_active
+        db.session.commit()
+        return source_token_config
+    except Exception as e:
+        logger.error(f"Error while updating SourceTokenRepository: {source_token_config.id} with error: {e}")
+        db.session.rollback()
+        return None
+
+
+def create_token_config(user_email, source, token_config):
+    """
+        Create a new SourceTokenRepository instance and add it to the database.
+    """
+    try:
+        token_config_md5 = hashlib.md5(json.dumps(token_config).encode('utf-8')).hexdigest()
+        source_token_configs = get_source_token_config_by(user_email=user_email, source=source,
+                                                          token_config_md5=token_config_md5)
+        if source_token_configs:
+            source_token_config = source_token_configs[0]
+            if source_token_config and not source_token_config.is_active:
+                updated_source_token_config = update_source_token_config(source_token_config, is_active=True)
+                if updated_source_token_config:
+                    return updated_source_token_config, True
+                else:
+                    return None, False
+            else:
+                return source_token_config, False
+
+        new_source_token = SourceTokenRepository(
+            user_email=user_email,
+            source=source,
+            token_config=token_config,
+            token_config_md5=token_config_md5
+        )
+        db.session.add(new_source_token)
+        db.session.commit()
+        return new_source_token, True
+    except Exception as e:
+        logger.error(
+            f"Error while saving Source Token: :{user_email}:{source} with error: {e}")
+        db.session.rollback()
+        return None, False

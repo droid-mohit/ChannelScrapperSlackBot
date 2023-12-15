@@ -1,10 +1,14 @@
+import json
 from datetime import datetime
 
 from flask import request
 from flask import jsonify, Blueprint
 
-from persistance.db_utils import create_slack_channel_scrap_schedule, get_slack_bot_configs_by
+from persistance.db_utils import create_slack_channel_scrap_schedule, get_slack_bot_configs_by, \
+    get_source_token_config_by
+from processors.sentry_client_apis import SentryApiProcessor
 from processors.slack_webclient_apis import SlackApiProcessor
+from route_handlers.app_route_handler import handler_source_token_registration
 from utils.time_utils import get_current_time
 
 app_blueprint = Blueprint('app_router', __name__)
@@ -16,7 +20,7 @@ def health_check():
     return jsonify({'success': True})
 
 
-@app_blueprint.route('/start_data_fetch', methods=['GET'])
+@app_blueprint.route('/slack/start_data_fetch', methods=['GET'])
 def start_data_fetch():
     channel_id = request.args.get('channel')
     bot_auth_token = request.args.get('token')
@@ -45,3 +49,66 @@ def start_data_fetch():
         data_extraction_from = datetime.fromtimestamp(float(oldest_timestamp))
     create_slack_channel_scrap_schedule(slack_bot_config.id, data_extraction_from, data_extraction_to)
     return jsonify({'success': True})
+
+
+@app_blueprint.route('/slack/get_channel_info', methods=['GET'])
+def get_channel_info():
+    channel_id = request.args.get('channel')
+    bot_auth_token = request.args.get('token')
+    if not channel_id or not bot_auth_token:
+        return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+
+    slack_bot_configs = get_slack_bot_configs_by(channel_id=channel_id, is_active=True)
+    if not slack_bot_configs:
+        return jsonify({'success': False, 'message': 'No active slack bot configs found for channel_id: {channel_id}'})
+
+    slack_api_processor = SlackApiProcessor(bot_auth_token)
+    channel_info = slack_api_processor.fetch_channel_info(channel_id)
+    if channel_info:
+        return jsonify(**channel_info)
+    return jsonify({'success': False, 'message': 'Failed to fetch channel info'})
+
+
+@app_blueprint.route('/register_source_token', methods=['POST'])
+def register_source_token():
+    request_data = request.data.decode('utf-8')
+    if request_data:
+        data = json.loads(request_data)
+        if 'user_email' not in data or 'source' not in data or 'token_config' not in data:
+            return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+
+        user_email = data['user_email']
+        source = data['source']
+        token_config = data['token_config']
+        saved_token_config = handler_source_token_registration(user_email, source, token_config)
+        if not saved_token_config:
+            return jsonify({'success': False, 'message': 'Failed to register token config'})
+        return jsonify({'success': True, 'message': 'Token config registered successfully'})
+
+
+@app_blueprint.route('/sentry/start_data_fetch', methods=['GET'])
+def sentry_start_data_fetch():
+    project_slug = request.args.get('project')
+    user_email = request.args.get('user_email')
+    if not project_slug or not user_email:
+        return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+    source_tokens = get_source_token_config_by(user_email, 'SENTRY', is_active=True)
+    if not source_tokens:
+        return jsonify(
+            {'success': False, 'message': f'No active source token configs found for user_email: {user_email}'})
+
+    source_token = source_tokens[0]
+    latest_timestamp = request.args.get('latest_timestamp')
+    if not latest_timestamp:
+        latest_timestamp = str(get_current_time())
+
+    oldest_timestamp = request.args.get('oldest_timestamp')
+    if not oldest_timestamp:
+        oldest_timestamp = ''
+
+    sentry_api_processor = SentryApiProcessor(source_token.token_config['bearer_token'],
+                                              source_token.token_config['organization_slug'], project_slug)
+    data_fetch_success = sentry_api_processor.fetch_events(latest_timestamp, oldest_timestamp)
+    if data_fetch_success:
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'message': 'Failed to fetch events'})
