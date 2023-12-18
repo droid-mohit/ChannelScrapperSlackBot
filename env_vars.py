@@ -13,7 +13,10 @@ AWS_ACCESS_KEY = 'your_aws_access_key'
 AWS_SECRET_KEY = 'your_aws_secret_key'
 METADATA_S3_BUCKET_NAME = 'your_metadata_s3_bucket_name'
 RAW_DATA_S3_BUCKET_NAME = 'your_raw_data_s3_bucket_name'
+NEW_RELIC_RAW_DATA_S3_BUCKET_NAME = 'your_new_relic_raw_data_s3_bucket_name'
+SENTRY_RAW_DATA_S3_BUCKET_NAME = 'your_sentry_raw_data_s3_bucket_name'
 
+# Slack Configurations
 PUSH_TO_SLACK = True
 SLACK_URL = 'your_slack_webhook_url'
 

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import requests
 
-from env_vars import RAW_DATA_S3_BUCKET_NAME, PUSH_TO_S3
+from env_vars import SENTRY_RAW_DATA_S3_BUCKET_NAME, PUSH_TO_S3
 from utils.publishsing_client import publish_object_file_to_s3
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ class SentryApiProcessor:
             file_path = os.path.join(base_dir, csv_file_name)
             raw_data.to_csv(file_path, index=False)
             if PUSH_TO_S3:
-                publish_object_file_to_s3(file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
+                publish_object_file_to_s3(file_path, SENTRY_RAW_DATA_S3_BUCKET_NAME, csv_file_name)
                 logger.info(f"Successfully extracted {message_counter} messages for project: {self.__project_slug}")
                 try:
                     os.remove(file_path)
