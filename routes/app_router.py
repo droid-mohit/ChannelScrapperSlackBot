@@ -6,6 +6,7 @@ from flask import jsonify, Blueprint
 
 from persistance.db_utils import create_slack_channel_scrap_schedule, get_slack_bot_configs_by, \
     get_source_token_config_by
+from processors.new_relic_rest_client import NewRelicRestApiProcessor
 from processors.sentry_client_apis import SentryApiProcessor
 from processors.slack_webclient_apis import SlackApiProcessor
 from route_handlers.app_route_handler import handler_source_token_registration
@@ -15,13 +16,30 @@ app_blueprint = Blueprint('app_router', __name__)
 
 
 @app_blueprint.route('/health_check', methods=['GET'])
-def health_check():
+def app_health_check():
     print('Data Scrapper App Backend is Up and Running!')
     return jsonify({'success': True})
 
 
+@app_blueprint.route('/register_source_token', methods=['POST'])
+def app_register_source_token():
+    request_data = request.data.decode('utf-8')
+    if request_data:
+        data = json.loads(request_data)
+        if 'user_email' not in data or 'source' not in data or 'token_config' not in data:
+            return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+
+        user_email = data['user_email']
+        source = data['source']
+        token_config = data['token_config']
+        saved_token_config = handler_source_token_registration(user_email, source, token_config)
+        if not saved_token_config:
+            return jsonify({'success': False, 'message': 'Failed to register token config'})
+        return jsonify({'success': True, 'message': 'Token config registered successfully'})
+
+
 @app_blueprint.route('/slack/start_data_fetch', methods=['GET'])
-def start_data_fetch():
+def slack_start_data_fetch():
     channel_id = request.args.get('channel')
     bot_auth_token = request.args.get('token')
     if not channel_id or not bot_auth_token:
@@ -52,7 +70,7 @@ def start_data_fetch():
 
 
 @app_blueprint.route('/slack/get_channel_info', methods=['GET'])
-def get_channel_info():
+def slack_get_channel_info():
     channel_id = request.args.get('channel')
     bot_auth_token = request.args.get('token')
     if not channel_id or not bot_auth_token:
@@ -67,23 +85,6 @@ def get_channel_info():
     if channel_info:
         return jsonify(**channel_info)
     return jsonify({'success': False, 'message': 'Failed to fetch channel info'})
-
-
-@app_blueprint.route('/register_source_token', methods=['POST'])
-def register_source_token():
-    request_data = request.data.decode('utf-8')
-    if request_data:
-        data = json.loads(request_data)
-        if 'user_email' not in data or 'source' not in data or 'token_config' not in data:
-            return jsonify({'success': False, 'message': 'Invalid arguments provided'})
-
-        user_email = data['user_email']
-        source = data['source']
-        token_config = data['token_config']
-        saved_token_config = handler_source_token_registration(user_email, source, token_config)
-        if not saved_token_config:
-            return jsonify({'success': False, 'message': 'Failed to register token config'})
-        return jsonify({'success': True, 'message': 'Token config registered successfully'})
 
 
 @app_blueprint.route('/sentry/start_data_fetch', methods=['GET'])
@@ -112,3 +113,36 @@ def sentry_start_data_fetch():
     if data_fetch_success:
         return jsonify({'success': True})
     return jsonify({'success': False, 'message': 'Failed to fetch events'})
+
+
+@app_blueprint.route('/new_relic/fetch_alert_policies_nrql_conditions', methods=['GET'])
+def new_relic_fetch_alert_policies_nrql_conditions():
+    nr_api_key = request.args.get('nr_api_key')
+    nr_account_id = request.args.get('nr_account_id')
+    nr_query_key = request.args.get('nr_query_key')
+    if not nr_api_key or not nr_account_id:
+        return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+
+    new_relic_rest_api_processor = NewRelicRestApiProcessor(nr_api_key, nr_account_id, nr_query_key)
+    all_policies_nrql_conditions = new_relic_rest_api_processor.fetch_alert_policies_nrql_conditions()
+    if not all_policies_nrql_conditions:
+        return jsonify({'success': False, 'message': 'Failed to fetch alert policies nrql conditions'})
+
+    return jsonify({'success': True})
+
+
+@app_blueprint.route('/new_relic/fetch_alert_violations', methods=['GET'])
+def new_relic_fetch_alert_violations():
+    nr_api_key = request.args.get('nr_api_key')
+    nr_account_id = request.args.get('nr_account_id')
+    nr_query_key = request.args.get('nr_query_key')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    if not nr_api_key or not nr_account_id:
+        return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+
+    new_relic_rest_api_processor = NewRelicRestApiProcessor(nr_api_key, nr_account_id, nr_query_key)
+    data_fetch_success = new_relic_rest_api_processor.fetch_alert_violations(start_date, end_date)
+    if data_fetch_success:
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'message': 'Failed to fetch alert violations'})

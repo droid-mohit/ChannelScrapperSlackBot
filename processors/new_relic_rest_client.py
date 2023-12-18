@@ -91,6 +91,8 @@ class NewRelicRestApiProcessor:
                     violations = alerts_data['violations']
                     all_violations.extend(violations)
                     print(f"Found {len(violations)} violations on page {i}")
+                    if len(violations) <= 0:
+                        break
                 else:
                     print(f"Error: {response.status_code}, {response.text}")
                     continue
@@ -154,6 +156,8 @@ class NewRelicRestApiProcessor:
                     policies = alert_policy_data['policies']
                     all_policies.extend(policies)
                     print(f"Found {len(policies)} policies on page {i}")
+                    if len(policies) <= 0:
+                        break
                 else:
                     print(f"Error: {response.status_code}, {response.text}")
                     continue
@@ -190,7 +194,7 @@ class NewRelicRestApiProcessor:
             return None
         return all_policies
 
-    def fetch_alert_policies_nrql_condition(self, policy_ids: [] = None):
+    def fetch_alert_policies_nrql_conditions(self, policy_ids: [] = None):
         alert_policies_nrql_url = f'{self.base_url}/alerts_nrql_conditions.json'
 
         # Set up the headers with the API key
@@ -203,9 +207,13 @@ class NewRelicRestApiProcessor:
         if policy_ids is None or len(policy_ids) <= 0:
             policy_ids = self.fetch_alert_policies()
 
-        for policy_id in policy_ids:
+        for policy in policy_ids:
             try:
                 # Make the API request to get the list of services
+                policy_id = policy.get('id', None)
+                if not policy_id:
+                    print(f"Skipping fetching nrql condition: policy_id not found")
+                    continue
                 print(f"Fetching alert policies nrql condition for policy_id: {policy_id}")
                 for i in range(0, 250):
                     params = {
@@ -224,8 +232,9 @@ class NewRelicRestApiProcessor:
                         for nrql_condition in nrql_conditions:
                             nrql_condition['policy_id'] = policy_id
                         all_policies_nrql_conditions.extend(nrql_conditions)
-
                         print(f"Found {len(nrql_conditions)} nrql conditions for policy {policy_id} on page {i}")
+                        if len(nrql_conditions) <= 0:
+                            break
                     else:
                         print(f"Error: {response.status_code}, {response.text}")
                         continue
