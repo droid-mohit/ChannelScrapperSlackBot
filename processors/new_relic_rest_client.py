@@ -6,7 +6,7 @@ from datetime import datetime
 
 import requests
 
-from env_vars import RAW_DATA_S3_BUCKET_NAME, PUSH_TO_S3
+from env_vars import NEW_RELIC_RAW_DATA_S3_BUCKET_NAME, PUSH_TO_S3
 from utils.publishsing_client import publish_object_file_to_s3
 
 logger = logging.getLogger(__name__)
@@ -108,8 +108,8 @@ class NewRelicRestApiProcessor:
                 file_path = os.path.join(base_dir, csv_file_name)
                 raw_data.to_csv(file_path, index=False)
                 if PUSH_TO_S3:
-                    publish_object_file_to_s3(file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
-                    logger.info(f"Successfully extracted {len(all_violations)} alerts for account: {self.__account_id}")
+                    publish_object_file_to_s3(file_path, NEW_RELIC_RAW_DATA_S3_BUCKET_NAME, csv_file_name)
+                    print(f"Successfully extracted {len(all_violations)} alerts for account: {self.__account_id}")
                     try:
                         os.remove(file_path)
                         logger.error(f"File '{file_path}' deleted successfully.")
@@ -173,9 +173,8 @@ class NewRelicRestApiProcessor:
                 file_path = os.path.join(base_dir, csv_file_name)
                 raw_data.to_csv(file_path, index=False)
                 if PUSH_TO_S3:
-                    publish_object_file_to_s3(file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
-                    logger.info(
-                        f"Successfully extracted {len(all_policies)} alert policies for account: {self.__account_id}")
+                    publish_object_file_to_s3(file_path, NEW_RELIC_RAW_DATA_S3_BUCKET_NAME, csv_file_name)
+                    print(f"Successfully extracted {len(all_policies)} alert policies for account: {self.__account_id}")
                     try:
                         os.remove(file_path)
                         logger.error(f"File '{file_path}' deleted successfully.")
@@ -241,32 +240,32 @@ class NewRelicRestApiProcessor:
             except Exception as e:
                 print(f"An error occurred: {e}")
 
-            try:
-                raw_data = pd.DataFrame(all_policies_nrql_conditions)
-                if raw_data.shape[0] > 0:
-                    raw_data = raw_data.reset_index(drop=True)
-                    base_dir = os.path.dirname(os.path.abspath(__file__))
-                    csv_file_name = f"{self.__account_id}-all_policies_nrql_conditions_data.csv"
-                    file_path = os.path.join(base_dir, csv_file_name)
-                    raw_data.to_csv(file_path, index=False)
-                    if PUSH_TO_S3:
-                        publish_object_file_to_s3(file_path, RAW_DATA_S3_BUCKET_NAME, csv_file_name)
-                        logger.info(f"Successfully extracted {len(all_policies_nrql_conditions)} "
-                                    f"policies nrql conditions for account: {self.__account_id}")
-                        try:
-                            os.remove(file_path)
-                            logger.error(f"File '{file_path}' deleted successfully.")
-                        except FileNotFoundError:
-                            logger.error(f"File '{file_path}' not found.")
-                        except PermissionError:
-                            logger.error(
-                                f"Permission error. You may not have the necessary permissions to delete the file.")
-                        except Exception as e:
-                            logger.error(f"An error occurred: {e}")
-                else:
-                    logger.error(f"No alert policy nrql conditions found for account: {self.__account_id}")
-                    return None
-            except Exception as e:
-                logger.error(f"An error occurred while fetching alert policy nrql conditions: {e}")
+        try:
+            raw_data = pd.DataFrame(all_policies_nrql_conditions)
+            if raw_data.shape[0] > 0:
+                raw_data = raw_data.reset_index(drop=True)
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                csv_file_name = f"{self.__account_id}-all_policies_nrql_conditions_data.csv"
+                file_path = os.path.join(base_dir, csv_file_name)
+                raw_data.to_csv(file_path, index=False)
+                if PUSH_TO_S3:
+                    publish_object_file_to_s3(file_path, NEW_RELIC_RAW_DATA_S3_BUCKET_NAME, csv_file_name)
+                    print(f"Successfully extracted {len(all_policies_nrql_conditions)} "
+                          f"policies nrql conditions for account: {self.__account_id}")
+                    try:
+                        os.remove(file_path)
+                        logger.error(f"File '{file_path}' deleted successfully.")
+                    except FileNotFoundError:
+                        logger.error(f"File '{file_path}' not found.")
+                    except PermissionError:
+                        logger.error(
+                            f"Permission error. You may not have the necessary permissions to delete the file.")
+                    except Exception as e:
+                        logger.error(f"An error occurred: {e}")
+            else:
+                logger.error(f"No alert policy nrql conditions found for account: {self.__account_id}")
                 return None
-            return all_policies_nrql_conditions
+        except Exception as e:
+            logger.error(f"An error occurred while fetching alert policy nrql conditions: {e}")
+            return None
+        return all_policies_nrql_conditions

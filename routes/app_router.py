@@ -120,11 +120,15 @@ def new_relic_fetch_alert_policies_nrql_conditions():
     nr_api_key = request.args.get('nr_api_key')
     nr_account_id = request.args.get('nr_account_id')
     nr_query_key = request.args.get('nr_query_key')
+    nr_policy_id = request.args.get('nr_policy_id')
     if not nr_api_key or not nr_account_id:
         return jsonify({'success': False, 'message': 'Invalid arguments provided'})
 
     new_relic_rest_api_processor = NewRelicRestApiProcessor(nr_api_key, nr_account_id, nr_query_key)
-    all_policies_nrql_conditions = new_relic_rest_api_processor.fetch_alert_policies_nrql_conditions()
+    policy_id = []
+    if nr_policy_id:
+        policy_id.append(nr_policy_id)
+    all_policies_nrql_conditions = new_relic_rest_api_processor.fetch_alert_policies_nrql_conditions(policy_id)
     if not all_policies_nrql_conditions:
         return jsonify({'success': False, 'message': 'Failed to fetch alert policies nrql conditions'})
 
