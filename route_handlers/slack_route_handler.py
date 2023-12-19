@@ -117,7 +117,7 @@ def handle_event_callback(data: Dict):
                                            + " " + "channel: " + "*" + channel_header + " and channel id: " + "*" + \
                                            channel_id + "*" + " at " + "event_ts: " + event_ts
                             publish_message_to_slack(message_text)
-                            data_fetch_job.delay(bot_auth_token, channel_id, event_ts, '')
+                            data_fetch_job.delay(bot_auth_token, channel_id, str(event_ts), '')
                     return True
                 else:
                     logger.error(f"Error while saving SlackBotConfig for workspace: {team_id}:{channel_id}:{event_ts}")
