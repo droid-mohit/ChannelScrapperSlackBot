@@ -8,7 +8,7 @@ from persistance.db_utils import get_slack_workspace_config_by, create_slack_bot
     get_slack_bot_configs_by, update_slack_bot_config, update_slack_workspace_config
 from processors.slack_webclient_apis import SlackApiProcessor
 from utils.publishsing_client import publish_json_blob_to_s3, publish_message_to_slack
-from utils.time_utils import get_current_datetime, get_current_time
+from utils.time_utils import get_current_datetime
 
 logger = logging.getLogger(__name__)
 
