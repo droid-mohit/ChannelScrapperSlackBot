@@ -8,7 +8,7 @@ from persistance.db_utils import get_slack_workspace_config_by, create_slack_bot
     get_slack_bot_configs_by, update_slack_bot_config, update_slack_workspace_config
 from processors.slack_webclient_apis import SlackApiProcessor
 from utils.publishsing_client import publish_json_blob_to_s3, publish_message_to_slack
-from utils.time_utils import get_current_datetime
+from utils.time_utils import get_current_datetime, get_current_time
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,8 @@ def handle_event_callback(data: Dict):
                                            + " " + "channel: " + "*" + channel_header + " and channel id: " + "*" + \
                                            channel_id + "*" + " at " + "event_ts: " + event_ts
                             publish_message_to_slack(message_text)
-                            data_fetch_job.delay(bot_auth_token, channel_id, event_ts)
+                            current_time = get_current_time()
+                            data_fetch_job.delay(bot_auth_token, channel_id, event_ts, current_time, '')
                     return True
                 else:
                     logger.error(f"Error while saving SlackBotConfig for workspace: {team_id}:{channel_id}:{event_ts}")
