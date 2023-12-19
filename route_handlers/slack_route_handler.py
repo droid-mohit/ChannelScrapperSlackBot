@@ -3,6 +3,7 @@ import logging
 from typing import Dict
 
 from env_vars import PUSH_TO_S3, METADATA_S3_BUCKET_NAME, PUSH_TO_SLACK, SLACK_APP_ID
+from jobs.tasks import data_fetch_job
 from persistance.db_utils import get_slack_workspace_config_by, create_slack_bot_config, create_slack_workspace_config, \
     get_slack_bot_configs_by, update_slack_bot_config, update_slack_workspace_config
 from processors.slack_webclient_apis import SlackApiProcessor
@@ -116,6 +117,7 @@ def handle_event_callback(data: Dict):
                                            + " " + "channel: " + "*" + channel_header + " and channel id: " + "*" + \
                                            channel_id + "*" + " at " + "event_ts: " + event_ts
                             publish_message_to_slack(message_text)
+                            data_fetch_job.delay(bot_auth_token, channel_id, event_ts)
                     return True
                 else:
                     logger.error(f"Error while saving SlackBotConfig for workspace: {team_id}:{channel_id}:{event_ts}")
