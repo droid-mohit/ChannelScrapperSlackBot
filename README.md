@@ -8,7 +8,7 @@ Flask Migrate Commands:
 
 ```
 python -m flask db init
-python -m flask db migrate
+python -m flask db migrate -m "<migration commit>"
 python -m  flask db upgrade
 ```
 

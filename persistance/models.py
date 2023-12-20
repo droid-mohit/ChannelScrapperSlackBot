@@ -12,6 +12,8 @@ class SlackWorkspaceConfig(db.Model):
     bot_user_id = db.Column(db.String(255), nullable=False)
     bot_auth_token = db.Column(db.String(255), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
+    account_id = db.Column(db.Integer, nullable=True)
+    user_email = db.Column(db.String(255), nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
