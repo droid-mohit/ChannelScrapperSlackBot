@@ -6,11 +6,10 @@ from flask import request
 from flask import jsonify, Blueprint
 
 from persistance.db_utils import create_slack_connector_channel_scrap_schedule, get_slack_connector_channel_key, \
-    get_source_token_config_by, get_account_slack_connector
+    get_connector_by, get_account_slack_connector, get_connector_key_by
 from processors.new_relic_rest_client import NewRelicRestApiProcessor
 from processors.sentry_client_apis import SentryApiProcessor
 from processors.slack_webclient_apis import SlackApiProcessor
-from route_handlers.app_route_handler import handler_source_token_registration
 from utils.time_utils import get_current_time
 
 app_blueprint = Blueprint('app_router', __name__)
@@ -97,16 +96,16 @@ def slack_get_channel_info():
 
 @app_blueprint.route('/sentry/start_data_fetch', methods=['GET'])
 def sentry_start_data_fetch():
+    account_id = request.args.get('account_id')
     project_slug = request.args.get('project')
-    user_email = request.args.get('user_email')
-    if not project_slug or not user_email:
+    if not account_id or not project_slug:
         return jsonify({'success': False, 'message': 'Invalid arguments provided'})
-    source_tokens = get_source_token_config_by(user_email, 'SENTRY', is_active=True)
-    if not source_tokens:
+    account_sentry_connectors = get_connector_by(account_id=account_id, connector_type=1, is_active=True)
+    if not account_sentry_connectors:
         return jsonify(
-            {'success': False, 'message': f'No active source token configs found for user_email: {user_email}'})
+            {'success': False, 'message': f'No active sentry connector found for account: {account_id}'})
 
-    source_token = source_tokens[0]
+    connector = account_sentry_connectors[0]
     latest_timestamp = request.args.get('latest_timestamp')
     if not latest_timestamp:
         latest_timestamp = str(get_current_time())
@@ -115,6 +114,11 @@ def sentry_start_data_fetch():
     if not oldest_timestamp:
         oldest_timestamp = ''
 
+    sentry_connector_key = get_connector_key_by(connector_id=connector.id, is_active=True)
+    if not sentry_connector_key:
+        return jsonify(
+            {'success': False, 'message': f'No active sentry connector key found for connector: {connector.id}'})
+    source_token = sentry_connector_key[0].key
     sentry_api_processor = SentryApiProcessor(source_token.token_config['bearer_token'],
                                               source_token.token_config['organization_slug'], project_slug)
     data_fetch_success = sentry_api_processor.fetch_events(latest_timestamp, oldest_timestamp)
@@ -125,13 +129,32 @@ def sentry_start_data_fetch():
 
 @app_blueprint.route('/new_relic/fetch_alert_policies_nrql_conditions', methods=['GET'])
 def new_relic_fetch_alert_policies_nrql_conditions():
-    nr_api_key = request.args.get('nr_api_key')
-    nr_account_id = request.args.get('nr_account_id')
-    nr_query_key = request.args.get('nr_query_key')
+    account_id = request.args.get('account_id')
     nr_policy_id = request.args.get('nr_policy_id')
-    if not nr_api_key or not nr_account_id:
+    if not account_id or not nr_policy_id:
         return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+    account_new_relic_connectors = get_connector_by(account_id=int(account_id), connector_type=18, is_active=True)
+    if not account_new_relic_connectors:
+        return jsonify(
+            {'success': False, 'message': f'No active new relic connector found for account: {account_id}'})
+    connector = account_new_relic_connectors[0]
+    connector_keys = get_connector_key_by(connector_id=connector.id, is_active=True)
+    if not connector_keys:
+        return jsonify(
+            {'success': False, 'message': f'No active new relic connector key found for connector: {connector.id}'})
 
+    nr_api_key = None
+    nr_account_id = None
+    nr_query_key = None
+    for keys in connector_keys:
+        if keys.key_type == 4:
+            nr_api_key = keys.value
+        elif keys.key_type == 5:
+            nr_account_id = keys.value
+        elif keys.key_type == 7:
+            nr_query_key = keys.value
+    if not nr_api_key or not nr_account_id:
+        return jsonify({'success': False, 'message': 'Connector Keys not found'})
     new_relic_rest_api_processor = NewRelicRestApiProcessor(nr_api_key, nr_account_id, nr_query_key)
     policy_id = []
     if nr_policy_id:
@@ -145,14 +168,33 @@ def new_relic_fetch_alert_policies_nrql_conditions():
 
 @app_blueprint.route('/new_relic/fetch_alert_violations', methods=['GET'])
 def new_relic_fetch_alert_violations():
-    nr_api_key = request.args.get('nr_api_key')
-    nr_account_id = request.args.get('nr_account_id')
-    nr_query_key = request.args.get('nr_query_key')
+    account_id = request.args.get('account_id')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-    if not nr_api_key or not nr_account_id:
+    if not account_id:
         return jsonify({'success': False, 'message': 'Invalid arguments provided'})
 
+    account_new_relic_connectors = get_connector_by(account_id=int(account_id), connector_type=18, is_active=True)
+    if not account_new_relic_connectors:
+        return jsonify(
+            {'success': False, 'message': f'No active new relic connector found for account: {account_id}'})
+    connector = account_new_relic_connectors[0]
+    connector_keys = get_connector_key_by(connector_id=connector.id, is_active=True)
+    if not connector_keys:
+        return jsonify(
+            {'success': False, 'message': f'No active new relic connector key found for connector: {connector.id}'})
+    nr_api_key = None
+    nr_account_id = None
+    nr_query_key = None
+    for keys in connector_keys:
+        if keys.key_type == 4:
+            nr_api_key = keys.value
+        elif keys.key_type == 5:
+            nr_account_id = keys.value
+        elif keys.key_type == 7:
+            nr_query_key = keys.value
+    if not nr_api_key or not nr_account_id:
+        return jsonify({'success': False, 'message': 'Connector Keys not found'})
     new_relic_rest_api_processor = NewRelicRestApiProcessor(nr_api_key, nr_account_id, nr_query_key)
     data_fetch_success = new_relic_rest_api_processor.fetch_alert_violations(start_date, end_date)
     if data_fetch_success:

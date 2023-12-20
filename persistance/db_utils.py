@@ -344,68 +344,96 @@ def create_alert_count_data(account_id, count_timestamp, channel_id, alert_type,
     return None, False
 
 
-def get_source_token_config_by(user_email: str = None, source: str = None, token_config_md5: str = None,
-                               is_active: bool = None):
+def get_connector_by(record_id: str = None, account_id: int = None, name: str = None, connector_type: int = None,
+                     metadata: Dict = None, is_active: bool = None):
     """
     Fetch a SourceTokenRepository row based on different options.
     """
     filters = {}
-    if user_email:
-        filters['user_email'] = user_email
-    if source:
-        filters['source'] = source
-    if token_config_md5:
-        filters['token_config_md5'] = token_config_md5
+    if record_id:
+        filters['id'] = record_id
+    if account_id:
+        filters['account_id'] = account_id
+    if name:
+        filters['name'] = name
+    if connector_type:
+        filters['connector_type'] = connector_type
+    if metadata:
+        for key, value in metadata.items():
+            filters[f"metadata->>'{key}'"] = value
     if is_active is not None:
         filters['is_active'] = is_active
 
-    source_token_configs = get_data('source_token_repository', filters)
-    return source_token_configs
+    connectors = get_data('connectors_connector', filters)
+    return connectors
 
 
-def update_source_token_config(record_id, is_active: bool = None):
+def get_connector_key_by(record_id: str = None, account_id: int = None, connector_id: int = None, key_type: int = None,
+                         metadata: Dict = None, is_active: bool = None):
     """
-    Update an existing SourceTokenRepository instance in the database.
+    Fetch a SourceTokenRepository row based on different options.
     """
-    try:
-        updated_data = {}
-        if is_active is not None:
-            updated_data['is_active'] = is_active
-        updated_row = update_data('source_token_repository', record_id, updated_data)
-        return updated_row
-    except Exception as e:
-        logger.error(f"Error while updating SourceTokenRepository: {record_id} with error: {e}")
-    return None
+    filters = {}
+    if record_id:
+        filters['id'] = record_id
+    if account_id:
+        filters['account_id'] = account_id
+    if connector_id:
+        filters['connector_id'] = connector_id
+    if key_type:
+        filters['key_type'] = key_type
+    if metadata:
+        for key, value in metadata.items():
+            filters[f"metadata->>'{key}'"] = value
+    if is_active is not None:
+        filters['is_active'] = is_active
+
+    connectors = get_data('connectors_connectorkey', filters)
+    return connectors
+
+# def update_source_token_config(record_id, is_active: bool = None):
+#     """
+#     Update an existing SourceTokenRepository instance in the database.
+#     """
+#     try:
+#         updated_data = {}
+#         if is_active is not None:
+#             updated_data['is_active'] = is_active
+#         updated_row = update_data('source_token_repository', record_id, updated_data)
+#         return updated_row
+#     except Exception as e:
+#         logger.error(f"Error while updating SourceTokenRepository: {record_id} with error: {e}")
+#     return None
 
 
-def create_source_token_config(user_email, source, token_config):
-    """
-        Create a new SourceTokenRepository instance and add it to the database.
-    """
-    try:
-        token_config_md5 = hashlib.md5(json.dumps(token_config).encode('utf-8')).hexdigest()
-        source_token_configs = get_source_token_config_by(user_email=user_email, source=source,
-                                                          token_config_md5=token_config_md5)
-        if source_token_configs:
-            source_token_config = source_token_configs[0]
-            if source_token_config and not source_token_config.is_active:
-                updated_source_token_config = update_source_token_config(source_token_config.id, is_active=True)
-                if updated_source_token_config:
-                    return updated_source_token_config, True
-                else:
-                    return None, False
-            else:
-                return source_token_config, False
-
-        new_source_token = create_data('source_token_repository', {
-            'user_email': user_email,
-            'source': source,
-            'token_config': token_config,
-            'token_config_md5': token_config_md5,
-            'is_active': True
-        })
-        if new_source_token:
-            return new_source_token, True
-    except Exception as e:
-        logger.error(f"Error while saving Source Token: :{user_email}:{source} with error: {e}")
-    return None, False
+# def create_source_token_config(user_email, source, token_config):
+#     """
+#         Create a new SourceTokenRepository instance and add it to the database.
+#     """
+#     try:
+#         token_config_md5 = hashlib.md5(json.dumps(token_config).encode('utf-8')).hexdigest()
+#         source_token_configs = get_source_token_config_by(user_email=user_email, source=source,
+#                                                           token_config_md5=token_config_md5)
+#         if source_token_configs:
+#             source_token_config = source_token_configs[0]
+#             if source_token_config and not source_token_config.is_active:
+#                 updated_source_token_config = update_source_token_config(source_token_config.id, is_active=True)
+#                 if updated_source_token_config:
+#                     return updated_source_token_config, True
+#                 else:
+#                     return None, False
+#             else:
+#                 return source_token_config, False
+#
+#         new_source_token = create_data('source_token_repository', {
+#             'user_email': user_email,
+#             'source': source,
+#             'token_config': token_config,
+#             'token_config_md5': token_config_md5,
+#             'is_active': True
+#         })
+#         if new_source_token:
+#             return new_source_token, True
+#     except Exception as e:
+#         logger.error(f"Error while saving Source Token: :{user_email}:{source} with error: {e}")
+#     return None, False
