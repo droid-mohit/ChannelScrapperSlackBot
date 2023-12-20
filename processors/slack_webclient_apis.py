@@ -34,7 +34,7 @@ class SlackApiProcessor:
         return None
 
     def fetch_conversation_history(self, team_id: str, channel_id: str, latest_timestamp: str, oldest_timestamp: str):
-        if not channel_id or not latest_timestamp or oldest_timestamp is None:
+        if not channel_id or not latest_timestamp or oldest_timestamp is None or not team_id:
             logger.error(f"Invalid arguments provided for fetch_conversation_history")
             return None
         channel_info = self.fetch_channel_info(channel_id)
