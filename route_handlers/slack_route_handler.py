@@ -158,12 +158,12 @@ def handle_event_callback(data: Dict):
                                                     str(event_ts),
                                                     '', is_first_run=True)
                         task_id = task.id
-                        data_extraction_from = datetime.fromtimestamp(float(event_ts))
+                        data_extraction_to = datetime.fromtimestamp(float(event_ts))
                         create_slack_connector_channel_scrap_schedule(account_slack_connector.account_id,
                                                                       account_slack_connector.id,
                                                                       channel_id,
                                                                       task_id,
-                                                                      data_extraction_from,
+                                                                      data_extraction_to,
                                                                       '')
                     return True
                 else:

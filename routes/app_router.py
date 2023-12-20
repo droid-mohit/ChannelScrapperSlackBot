@@ -73,7 +73,7 @@ def slack_start_data_fetch():
         data_extraction_from = datetime.fromtimestamp(float(oldest_timestamp))
     task_run_id = 'MANUAL#' + uuid.uuid4().hex
     create_slack_connector_channel_scrap_schedule(slack_connector.account_id, slack_connector.id, channel_id,
-                                                  task_run_id, data_extraction_from, data_extraction_to)
+                                                  task_run_id, data_extraction_to, data_extraction_from)
     return jsonify({'success': True})
 
 
