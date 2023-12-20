@@ -42,6 +42,7 @@ def app_register_source_token():
 @app_blueprint.route('/slack/start_data_fetch', methods=['GET'])
 def slack_start_data_fetch():
     channel_id = request.args.get('channel')
+    team_id = request.args.get('team')
     bot_auth_token = request.args.get('token')
     if not channel_id or not bot_auth_token:
         return jsonify({'success': False, 'message': 'Invalid arguments provided'})
@@ -64,7 +65,7 @@ def slack_start_data_fetch():
         oldest_timestamp = ''
 
     slack_api_processor = SlackApiProcessor(bot_auth_token)
-    slack_api_processor.fetch_conversation_history(channel_id, latest_timestamp, oldest_timestamp)
+    slack_api_processor.fetch_conversation_history(team_id, channel_id, latest_timestamp, oldest_timestamp)
 
     data_extraction_to = datetime.fromtimestamp(float(latest_timestamp))
     data_extraction_from = None

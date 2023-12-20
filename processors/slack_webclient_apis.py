@@ -33,7 +33,7 @@ class SlackApiProcessor:
             logger.error(f"Exception occurred while fetching channel info for channel_id: {channel_id} with error: {e}")
         return None
 
-    def fetch_conversation_history(self, channel_id: str, latest_timestamp: str, oldest_timestamp: str):
+    def fetch_conversation_history(self, team_id: str, channel_id: str, latest_timestamp: str, oldest_timestamp: str):
         if not channel_id or not latest_timestamp or oldest_timestamp is None:
             logger.error(f"Invalid arguments provided for fetch_conversation_history")
             return None
@@ -105,10 +105,9 @@ class SlackApiProcessor:
             latest_datetime = datetime.fromtimestamp(float(latest_timestamp))
             if channel_info:
                 channel_name = channel_info['name']
-                team_id = channel_info['context_team_id']
                 csv_file_name = f"{team_id}-{channel_id}-{channel_name}-{latest_datetime}-raw_data.csv"
             else:
-                csv_file_name = f"{channel_id}-{latest_datetime}-raw_data.csv"
+                csv_file_name = f"{team_id}-{channel_id}-{latest_datetime}-raw_data.csv"
             file_path = os.path.join(base_dir, csv_file_name)
 
             raw_data.to_csv(file_path, index=False)
