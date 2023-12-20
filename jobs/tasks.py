@@ -76,7 +76,8 @@ def data_fetch_job(account_id, connector_id, bot_auth_token: str, channel_id: st
         print(f"Initiating Data Fetch Job for channel_id: {channel_id} at epoch: {current_time} with "
               f"latest_timestamp: {latest_timestamp}, oldest_timestamp: {oldest_timestamp}")
         slack_api_processor = SlackApiProcessor(bot_auth_token)
-        raw_data = slack_api_processor.fetch_conversation_history(channel_id, latest_timestamp, oldest_timestamp)
+        raw_data = slack_api_processor.fetch_conversation_history(workspace_id, channel_id, latest_timestamp,
+                                                                  oldest_timestamp)
         if not raw_data.shape[0] > 0:
             print(
                 f"Found no data for channel_id: {channel_id} at epoch: {current_time} with connector_id: {connector_id}")
