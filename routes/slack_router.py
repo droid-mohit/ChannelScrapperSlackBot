@@ -7,7 +7,7 @@ from flask import request, redirect
 from env_vars import SLACK_CLIENT_ID, SLACK_REDIRECT_URI, SLACK_CLIENT_SECRET
 from flask import jsonify, Blueprint
 
-from persistance.db_utils import get_account_id_for_user
+from persistance.db_utils import get_account_for_user_email
 from route_handlers.slack_route_handler import handle_oauth_callback, handle_event_callback
 
 slack_blueprint = Blueprint('slack_router', __name__)
@@ -30,12 +30,12 @@ def oauth_redirect():
     code = request.args.get('code')
     state = request.args.get('state')
     state = json.loads(state)
-    accounts = get_account_id_for_user(state['user_email'])
+    accounts = get_account_for_user_email(state['user_email'])
     if not accounts:
         logger.error(
             f"Error while fetching bot OAuth token with error: No account found for user_email: {state['user_email']}")
         return jsonify(
-            {'success': False, 'message': 'Alert Summary Bot Installation failed with error: No account found'})
+            {'success': False, 'message': 'Alert Summary Bot Installation failed: Kenobi Account not found'})
     if not code:
         logger.error(f"Error while fetching bot OAuth token with error: No code found")
         return jsonify({'success': False, 'message': 'Alert Summary Bot Installation failed with error: No code found'})
@@ -49,10 +49,10 @@ def oauth_redirect():
 
     # Parse the response
     data = response.json()
-    account_id = accounts[0].id
+    account_id = accounts[0].account_id
     # Extract the OAuth token
     if 'ok' in data:
-        response = handle_oauth_callback(data, account_id)
+        response = handle_oauth_callback(account_id, data)
         if response:
             return jsonify({'success': True, 'message': 'Alert Summary Bot Installation successful'})
         else:

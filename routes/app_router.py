@@ -1,11 +1,12 @@
 import json
+import uuid
 from datetime import datetime
 
 from flask import request
 from flask import jsonify, Blueprint
 
-from persistance.db_utils import create_slack_channel_scrap_schedule, get_slack_bot_configs_by, \
-    get_source_token_config_by
+from persistance.db_utils import create_slack_connector_channel_scrap_schedule, get_slack_connector_channel_key, \
+    get_source_token_config_by, get_account_slack_connector
 from processors.new_relic_rest_client import NewRelicRestApiProcessor
 from processors.sentry_client_apis import SentryApiProcessor
 from processors.slack_webclient_apis import SlackApiProcessor
@@ -45,11 +46,15 @@ def slack_start_data_fetch():
     if not channel_id or not bot_auth_token:
         return jsonify({'success': False, 'message': 'Invalid arguments provided'})
 
-    slack_bot_configs = get_slack_bot_configs_by(channel_id=channel_id, is_active=True)
-    if not slack_bot_configs:
-        return jsonify({'success': False, 'message': 'No active slack bot configs found for channel_id: {channel_id}'})
+    slack_connector_channel_keys = get_slack_connector_channel_key(channel_id=channel_id, is_active=True)
+    if not slack_connector_channel_keys:
+        return jsonify(
+            {'success': False, 'message': f'No active slack connector channel key found for channel_id: {channel_id}'})
 
-    slack_bot_config = slack_bot_configs[0]
+    slack_connector_channel_key = slack_connector_channel_keys[0]
+    slack_connector = get_account_slack_connector(record_id=slack_connector_channel_key.connector_id)
+    slack_connector = slack_connector[0]
+
     latest_timestamp = request.args.get('latest_timestamp')
     if not latest_timestamp:
         latest_timestamp = str(get_current_time())
@@ -65,7 +70,9 @@ def slack_start_data_fetch():
     data_extraction_from = None
     if oldest_timestamp:
         data_extraction_from = datetime.fromtimestamp(float(oldest_timestamp))
-    create_slack_channel_scrap_schedule(slack_bot_config.id, data_extraction_from, data_extraction_to)
+    task_run_id = 'MANUAL#' + uuid.uuid4().hex
+    create_slack_connector_channel_scrap_schedule(slack_connector.account_id, slack_connector.id, channel_id,
+                                                  task_run_id, data_extraction_from, data_extraction_to)
     return jsonify({'success': True})
 
 
@@ -76,7 +83,7 @@ def slack_get_channel_info():
     if not channel_id or not bot_auth_token:
         return jsonify({'success': False, 'message': 'Invalid arguments provided'})
 
-    slack_bot_configs = get_slack_bot_configs_by(channel_id=channel_id, is_active=True)
+    slack_bot_configs = get_slack_connector_channel_key(channel_id=channel_id, is_active=True)
     if not slack_bot_configs:
         return jsonify({'success': False, 'message': 'No active slack bot configs found for channel_id: {channel_id}'})
 

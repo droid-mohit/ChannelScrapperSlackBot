@@ -5,39 +5,59 @@ from celery_app import celery, app
 def periodic_data_fetch_job():
     with app.app_context():
         from utils.time_utils import get_current_time
-        from persistance.db_utils import get_slack_bot_configs_by, get_last_slack_channel_scrap_schedule_for, \
-            create_slack_channel_scrap_schedule
+        from persistance.db_utils import get_account_slack_connector, get_slack_connector_channel_key, \
+            create_slack_connector_channel_scrap_schedule, get_latest_slack_connector_scrap_schedule_for_channel
         from datetime import datetime
 
         current_time = get_current_time()
-
-        slack_bot_configs = get_slack_bot_configs_by(is_active=True)
-        if not slack_bot_configs:
-            print(f"No active slack bot configs found")
+        active_slack_connectors = get_account_slack_connector(is_active=True)
+        if not active_slack_connectors:
+            print(f"No active slack connectors found")
             return
-        for slack_bot_config in slack_bot_configs:
-            latest_timestamp = current_time
-            oldest_timestamp = None
-            slack_channel_config_id = slack_bot_config.id
-            channel_id = slack_bot_config.channel_id
-            latest_schedule = get_last_slack_channel_scrap_schedule_for(slack_channel_config_id)
-            if latest_schedule:
-                oldest_timestamp = str(latest_schedule.data_extraction_to.timestamp())
-            bot_auth_token = slack_bot_config.slack_workspace.bot_auth_token
-            print(f"Scheduling Data Fetch Job for channel_id: {channel_id} at epoch: {current_time}")
-            data_fetch_job.delay(bot_auth_token, channel_id, latest_timestamp, oldest_timestamp)
-            data_extraction_to = datetime.fromtimestamp(float(latest_timestamp))
-            data_extraction_from = None
-            if oldest_timestamp:
-                data_extraction_from = datetime.fromtimestamp(float(oldest_timestamp))
-            create_slack_channel_scrap_schedule(slack_channel_config_id, data_extraction_from, data_extraction_to)
+        for connector in active_slack_connectors:
+            slack_channel_keys = get_slack_connector_channel_key(account_slack_connector_id=connector.id,
+                                                                 is_active=True)
+            if not slack_channel_keys:
+                print(f"No active slack channel keys found for connector: {connector.id}")
+                continue
+            for channel in slack_channel_keys:
+                bot_auth_token = connector.metadata.get('bot_auth_token')
+                workspace_id = connector.metadata.get('team_id')
+                channel_id = channel.key
+
+                latest_timestamp = current_time
+                oldest_timestamp = ''
+
+                latest_schedule = get_latest_slack_connector_scrap_schedule_for_channel(connector.id, channel_id)
+                if latest_schedule:
+                    if latest_schedule.metadata.get('data_extraction_from', ''):
+                        oldest_datetime_str = latest_schedule.metadata.get('data_extraction_from')
+                        if oldest_datetime_str:
+                            oldest_timestamp = datetime.strptime(oldest_datetime_str, '%Y-%m-%d %H:%M:%S').timestamp()
+                            oldest_timestamp = str(oldest_timestamp)
+
+                print(f"Scheduling Data Fetch Job for channel_id: {channel_id} at epoch: {current_time}")
+
+                task_run = data_fetch_job.delay(connector.account_id, connector.id, bot_auth_token, channel_id,
+                                                workspace_id, latest_timestamp, oldest_timestamp)
+                task_run_id = task_run.id
+                data_extraction_to = datetime.fromtimestamp(float(latest_timestamp))
+                data_extraction_from = None
+                if oldest_timestamp:
+                    data_extraction_from = datetime.fromtimestamp(float(oldest_timestamp))
+
+                create_slack_connector_channel_scrap_schedule(connector.account_id, connector.id, channel_id,
+                                                              task_run_id, data_extraction_to, data_extraction_from)
 
 
 @celery.task
-def data_fetch_job(bot_auth_token: str, channel_id: str, latest_timestamp: str, oldest_timestamp: str):
+def data_fetch_job(account_id, connector_id, bot_auth_token: str, channel_id: str, workspace_id: str,
+                   latest_timestamp: str, oldest_timestamp: str, is_first_run=False):
     with app.app_context():
         from processors.slack_webclient_apis import SlackApiProcessor
         from utils.time_utils import get_current_time
+        from processors.phase_1_report_processor import full_function
+        from persistance.db_utils import create_connector_extract_data, create_alert_count_data
 
         current_time = get_current_time()
 
@@ -56,4 +76,22 @@ def data_fetch_job(bot_auth_token: str, channel_id: str, latest_timestamp: str, 
         print(f"Initiating Data Fetch Job for channel_id: {channel_id} at epoch: {current_time} with "
               f"latest_timestamp: {latest_timestamp}, oldest_timestamp: {oldest_timestamp}")
         slack_api_processor = SlackApiProcessor(bot_auth_token)
-        slack_api_processor.fetch_conversation_history(channel_id, latest_timestamp, oldest_timestamp)
+        raw_data = slack_api_processor.fetch_conversation_history(channel_id, latest_timestamp, oldest_timestamp)
+        if not raw_data.shape[0] > 0:
+            print(
+                f"Found no data for channel_id: {channel_id} at epoch: {current_time} with connector_id: {connector_id}")
+            return
+        # for index, row in raw_data.iterrows():
+        #     data_uuid = row['uuid']
+        #     full_message = row['full_message']
+        #     create_connector_extract_data(account_id=account_id, connector_id=connector_id, channel_id=channel_id,
+        #                                   data_uuid=data_uuid, full_message=full_message)
+
+        phase_1_dataset = full_function(raw_data, workspace_id, channel_id)
+        for index, row in phase_1_dataset.iterrows():
+            row_timestamp = str(row['timestamp'])
+            create_alert_count_data(account_id=account_id, count_timestamp=row_timestamp, channel_id=channel_id,
+                                    alert_type=row['alert_type'], count=row['count'])
+        if is_first_run:
+            print(f"First run for channel_id: {channel_id}. Publishing report.")
+        return

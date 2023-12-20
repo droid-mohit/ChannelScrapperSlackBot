@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 from http.client import IncompleteRead
 
@@ -35,7 +36,7 @@ class SlackApiProcessor:
     def fetch_conversation_history(self, channel_id: str, latest_timestamp: str, oldest_timestamp: str):
         if not channel_id or not latest_timestamp or oldest_timestamp is None:
             logger.error(f"Invalid arguments provided for fetch_conversation_history")
-            return False
+            return None
         channel_info = self.fetch_channel_info(channel_id)
         raw_data = pd.DataFrame(columns=["uuid", "full_message"])
         message_counter = 0
@@ -89,7 +90,7 @@ class SlackApiProcessor:
         except Exception as e:
             logger.error(
                 f"Exception occurred while fetching conversation history for channel_id: {channel_id} with error: {e}")
-            return False
+            return None
 
         if raw_data.shape[0] > 0:
             raw_data = raw_data.reset_index(drop=True)
@@ -126,5 +127,5 @@ class SlackApiProcessor:
         else:
             logger.error(
                 f"No new messages found for channel_id: {channel_id} between {latest_timestamp} and {oldest_timestamp}")
-            return False
-        return True
+            return None
+        return raw_data
