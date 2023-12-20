@@ -22,21 +22,21 @@ def app_health_check():
     return jsonify({'success': True})
 
 
-@app_blueprint.route('/register_source_token', methods=['POST'])
-def app_register_source_token():
-    request_data = request.data.decode('utf-8')
-    if request_data:
-        data = json.loads(request_data)
-        if 'user_email' not in data or 'source' not in data or 'token_config' not in data:
-            return jsonify({'success': False, 'message': 'Invalid arguments provided'})
-
-        user_email = data['user_email']
-        source = data['source']
-        token_config = data['token_config']
-        saved_token_config = handler_source_token_registration(user_email, source, token_config)
-        if not saved_token_config:
-            return jsonify({'success': False, 'message': 'Failed to register token config'})
-        return jsonify({'success': True, 'message': 'Token config registered successfully'})
+# @app_blueprint.route('/register_source_token', methods=['POST'])
+# def app_register_source_token():
+#     request_data = request.data.decode('utf-8')
+#     if request_data:
+#         data = json.loads(request_data)
+#         if 'user_email' not in data or 'source' not in data or 'token_config' not in data:
+#             return jsonify({'success': False, 'message': 'Invalid arguments provided'})
+#
+#         user_email = data['user_email']
+#         source = data['source']
+#         token_config = data['token_config']
+#         saved_token_config = handler_source_token_registration(user_email, source, token_config)
+#         if not saved_token_config:
+#             return jsonify({'success': False, 'message': 'Failed to register token config'})
+#         return jsonify({'success': True, 'message': 'Token config registered successfully'})
 
 
 @app_blueprint.route('/slack/start_data_fetch', methods=['GET'])
