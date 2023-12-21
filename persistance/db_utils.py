@@ -99,7 +99,7 @@ def get_account_slack_connector(team_id: str = None, account_id: int = None, tea
     filters = {}
     if record_id:
         filters['id'] = record_id
-    if team_name:
+    if team_id:
         filters[f"metadata->>'team_id'"] = team_id
     if account_id:
         filters['account_id'] = account_id
