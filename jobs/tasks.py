@@ -82,11 +82,11 @@ def data_fetch_job(account_id, connector_id, bot_auth_token: str, channel_id: st
             print(
                 f"Found no data for channel_id: {channel_id} at epoch: {current_time} with connector_id: {connector_id}")
             return
-        # for index, row in raw_data.iterrows():
-        #     data_uuid = row['uuid']
-        #     full_message = row['full_message']
-        #     create_connector_extract_data(account_id=account_id, connector_id=connector_id, channel_id=channel_id,
-        #                                   data_uuid=data_uuid, full_message=full_message)
+        for index, row in raw_data.iterrows():
+            data_uuid = row['uuid']
+            full_message = row['full_message']
+            create_connector_extract_data(account_id=account_id, connector_id=connector_id, channel_id=channel_id,
+                                          data_uuid=data_uuid, full_message=full_message)
 
         phase_1_dataset = full_function(raw_data, workspace_id, channel_id)
         for index, row in phase_1_dataset.iterrows():
