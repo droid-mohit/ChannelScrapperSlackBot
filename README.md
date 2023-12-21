@@ -34,3 +34,5 @@ Current Supported Sources:
 
 1. Slack Channels
 2. Google Chat Spaces
+3. Sentry
+4. New Relic
