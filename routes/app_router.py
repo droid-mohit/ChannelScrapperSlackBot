@@ -148,11 +148,11 @@ def new_relic_fetch_alert_policies_nrql_conditions():
     nr_query_key = None
     for keys in connector_keys:
         if keys.key_type == 4:
-            nr_api_key = keys.value
+            nr_api_key = keys.key
         elif keys.key_type == 5:
-            nr_account_id = keys.value
+            nr_account_id = keys.key
         elif keys.key_type == 7:
-            nr_query_key = keys.value
+            nr_query_key = keys.key
     if not nr_api_key or not nr_account_id:
         return jsonify({'success': False, 'message': 'Connector Keys not found'})
     new_relic_rest_api_processor = NewRelicRestApiProcessor(nr_api_key, nr_account_id, nr_query_key)

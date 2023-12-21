@@ -57,6 +57,7 @@ def data_fetch_job(account_id, connector_id, bot_auth_token: str, channel_id: st
         from processors.slack_webclient_apis import SlackApiProcessor
         from utils.time_utils import get_current_time
         from processors.phase_1_report_processor import full_function
+        from utils.http_utils import send_report_intimation
         from persistance.db_utils import create_connector_extract_data, create_alert_count_data
 
         current_time = get_current_time()
@@ -95,4 +96,5 @@ def data_fetch_job(account_id, connector_id, bot_auth_token: str, channel_id: st
                                     alert_type=row['alert_type'], count=row['count'])
         if is_first_run:
             print(f"First run for channel_id: {channel_id}. Publishing report.")
+            send_report_intimation(account_id=account_id)
         return
