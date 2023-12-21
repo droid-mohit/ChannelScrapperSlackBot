@@ -296,25 +296,45 @@ def get_latest_slack_connector_scrap_schedule_for_channel(connector_id, channel_
     return slack_connector_channel_schedule[0] if slack_connector_channel_schedule else None
 
 
+def get_connector_extract_data(account_id, connector_id=None, channel_id=None, order_by='created_at DESC', limit=50):
+    if not account_id:
+        return None
+    filters = {'account_id': account_id}
+    if connector_id:
+        filters['connector_id'] = connector_id
+    if channel_id:
+        filters['channel_id'] = channel_id
+
+    return get_data('connectors_connectorsourceextractdata', filters, order_by_clause=order_by, limit=limit)
+
+
 def create_connector_extract_data(account_id, connector_id, channel_id, data_uuid, full_message):
-    """
-        Create a new SlackConnectorChannelKey instance and add it to the database.
-        """
     try:
-        full_message_json = json.dumps(full_message, ensure_ascii=False)
-        full_message_json = full_message_json.replace("'", "''")
-        alert_count_data = create_data('connectors_connectorsourceextractdata', {
+
+        if isinstance(full_message, dict):
+            full_message = json.dumps(full_message)
+        elif isinstance(full_message, str):
+            full_message = full_message
+        else:
+            full_message = str(full_message)
+
+        extracted_data = {
             'account_id': account_id,
             'connector_id': connector_id,
             'source': channel_id,
             'data_uuid': data_uuid,
-            'data': full_message_json,
+            'data': full_message,
             'created_at': 'now()',
             'updated_at': 'now()'
-        })
+        }
 
-        if alert_count_data:
-            return alert_count_data, True
+        sql_query = text(
+            "INSERT INTO connectors_connectorsourceextractdata (account_id, connector_id, source, data_uuid, data, created_at, updated_at) VALUES (:account_id, :connector_id, :source, :data_uuid, :data, :created_at, :updated_at) RETURNING *")
+        with db.engine.connect() as connection:
+            result = connection.execute(sql_query, extracted_data)
+            new_row = result.fetchone()
+            connection.commit()
+            return new_row, True
     except Exception as e:
         print("Error while saving ConnectorExtractData: ", e)
     return None, False
