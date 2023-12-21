@@ -204,20 +204,22 @@ class NewRelicRestApiProcessor:
 
         all_policies_nrql_conditions = []
         if policy_ids is None or len(policy_ids) <= 0:
-            policy_ids = self.fetch_alert_policies()
+            policy_id_json = self.fetch_alert_policies()
+            policy_ids = []
+            for policy in policy_id_json:
+                policy_ids.append(policy['id'])
 
         for policy in policy_ids:
             try:
                 # Make the API request to get the list of services
-                policy_id = policy.get('id', None)
-                if not policy_id:
+                if not policy:
                     print(f"Skipping fetching nrql condition: policy_id not found")
                     continue
-                print(f"Fetching alert policies nrql condition for policy_id: {policy_id}")
+                print(f"Fetching alert policies nrql condition for policy_id: {policy}")
                 for i in range(0, 250):
                     params = {
                         'page': i,
-                        'policy_id': policy_id
+                        'policy_id': policy
                     }
                     response = requests.get(alert_policies_nrql_url, headers=headers, params=params)
 
@@ -229,9 +231,9 @@ class NewRelicRestApiProcessor:
                         # Extract and print the list of services
                         nrql_conditions = alert_policy_data['nrql_conditions']
                         for nrql_condition in nrql_conditions:
-                            nrql_condition['policy_id'] = policy_id
+                            nrql_condition['policy_id'] = policy
                         all_policies_nrql_conditions.extend(nrql_conditions)
-                        print(f"Found {len(nrql_conditions)} nrql conditions for policy {policy_id} on page {i}")
+                        print(f"Found {len(nrql_conditions)} nrql conditions for policy {policy} on page {i}")
                         if len(nrql_conditions) <= 0:
                             break
                     else:

@@ -29,3 +29,6 @@ PG_DB_NAME = 'data_scrapper_db'
 # G-chat App Configurations
 GOOGLE_OAUTH_REDIRECT_URI = 'your_redirect_uri'
 GOOGLE_CLIENT_SECRETS_FILE = "google_chat_app_secret.json"
+
+# HTTP Hosts
+REPORT_SERVICE_URL = 'https://demo2.drdroid.io'
