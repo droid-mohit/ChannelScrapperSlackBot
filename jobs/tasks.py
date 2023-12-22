@@ -29,14 +29,15 @@ def periodic_data_fetch_job():
                 oldest_timestamp = ''
 
                 latest_schedule = get_latest_slack_connector_scrap_schedule_for_channel(connector.id, channel_id)
-                if latest_schedule:
-                    if latest_schedule.metadata.get('data_extraction_from', ''):
-                        oldest_datetime_str = latest_schedule.metadata.get('data_extraction_from')
-                        if oldest_datetime_str:
-                            oldest_timestamp = datetime.strptime(oldest_datetime_str, '%Y-%m-%d %H:%M:%S').timestamp()
-                            oldest_timestamp = str(oldest_timestamp)
+                if latest_schedule and latest_schedule.metadata is not None:
+                    oldest_datetime_str = latest_schedule.metadata.get('data_extraction_to', '')
+                    if oldest_datetime_str:
+                        oldest_timestamp = datetime.strptime(oldest_datetime_str, '%Y-%m-%d %H:%M:%S').timestamp()
+                        oldest_timestamp = str(oldest_timestamp)
 
-                print(f"Scheduling Data Fetch Job for channel_id: {channel_id} at epoch: {current_time}")
+                print(f"Scheduling Data Fetch Job for account:{connector.account_id} connector: {connector.id} "
+                      f"channel_id: {channel_id} at epoch: {current_time} with latest_timestamp: {latest_timestamp}, "
+                      f"oldest_timestamp: {oldest_timestamp}")
 
                 task_run = data_fetch_job.delay(connector.account_id, connector.id, bot_auth_token, channel_id,
                                                 workspace_id, latest_timestamp, oldest_timestamp)
@@ -74,14 +75,14 @@ def data_fetch_job(account_id, connector_id, bot_auth_token: str, channel_id: st
         if not oldest_timestamp:
             oldest_timestamp = ''
 
-        print(f"Initiating Data Fetch Job for channel_id: {channel_id} at epoch: {current_time} with "
-              f"latest_timestamp: {latest_timestamp}, oldest_timestamp: {oldest_timestamp}")
+        print(f"Initiating Data Fetch Job for account:{account_id} connector: {connector_id} channel_id: {channel_id} "
+              f"at epoch: {current_time} with latest_timestamp: {latest_timestamp}, oldest_timestamp: {oldest_timestamp}")
         slack_api_processor = SlackApiProcessor(bot_auth_token)
         raw_data = slack_api_processor.fetch_conversation_history(workspace_id, channel_id, latest_timestamp,
                                                                   oldest_timestamp)
-        if not raw_data.shape[0] > 0:
-            print(
-                f"Found no data for channel_id: {channel_id} at epoch: {current_time} with connector_id: {connector_id}")
+        if raw_data is None or not raw_data.shape[0] > 0:
+            print(f"Found no data for channel_id: {channel_id} at epoch: {current_time} "
+                  f"with connector_id: {connector_id}")
             return
         for index, row in raw_data.iterrows():
             data_uuid = row['uuid']
