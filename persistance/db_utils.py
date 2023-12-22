@@ -93,7 +93,7 @@ def get_account_slack_connector(team_id: str = None, account_id: int = None, tea
     """
     Fetch a AccountSlackConnector row based on different options.
     """
-    filters = {}
+    filters = {'connector_type': 19}
     if record_id:
         filters['id'] = record_id
     if team_id:
