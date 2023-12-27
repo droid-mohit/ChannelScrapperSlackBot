@@ -48,7 +48,7 @@ def source_identifier(full_message_cell):
         if (message.get('subtype')!='bot_message'):
             source = "Not an alert"
         elif 'username' in message:
-            source = message.get('username')
+            source = message.get('username',"")
         if source == '':
             source = 'custom_bot'
     elif attachments:
