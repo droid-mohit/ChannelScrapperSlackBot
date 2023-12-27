@@ -32,7 +32,7 @@ def source_identifier(full_message_cell):
                           'CriticalContainerCPUUsage', 'ThanosCompactIsDown', 'AlertmanagerClusterDown',
                           'ThanosStoreIsDown']
     apm_keywords = ['latency']
-    infra_keywords_extension = ['Aurora', 'Replica','CPUUtilization','Redshift', 'replication', 'rabbitmq', 'amazonMQ','CacheClusterId', 'DBInstanceIdentifier', 'QueueName', 'DBClusterIdentifier', 'Metric readIOPS', 'Metric writeIOPS','RDS']
+    # infra_keywords_extension = ['Aurora', 'Replica','CPUUtilization','Redshift', 'replication', 'rabbitmq', 'amazonMQ','CacheClusterId', 'DBInstanceIdentifier', 'QueueName', 'DBClusterIdentifier', 'Metric readIOPS', 'Metric writeIOPS','RDS']
     unrelated_bots_keywords = ['giphy','polly']
     grafana_keywords = ['grafana']
     source = ""
@@ -79,8 +79,8 @@ def source_identifier(full_message_cell):
             source = 'Sentry'
         elif any(key_word.lower() in str(message).lower() for key_word in container_keywords):
             source = 'Container'
-        elif any(key_word.lower() in str(message).lower() for key_word in infra_keywords_extension):
-            source = 'Cloudwatch'
+        # elif any(key_word.lower() in str(message).lower() for key_word in infra_keywords_extension):
+        #     source = 'Cloudwatch'
         elif any(key_word.lower() in str(message).lower() for key_word in grafana_keywords):
             source = 'Grafana'
     return source
