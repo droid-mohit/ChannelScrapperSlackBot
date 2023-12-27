@@ -32,25 +32,24 @@ def source_identifier(full_message_cell):
                           'CriticalContainerCPUUsage', 'ThanosCompactIsDown', 'AlertmanagerClusterDown',
                           'ThanosStoreIsDown']
     apm_keywords = ['latency']
-    infra_keywords_extension = ['Aurora', 'Replica', 'CPUUtilization', 'Redshift', 'replication', 'rabbitmq',
-                                'amazonMQ', 'CacheClusterId', 'DBInstanceIdentifier', 'QueueName',
-                                'DBClusterIdentifier', 'Metric readIOPS', 'Metric writeIOPS', 'AWS', 'RDS']
-    unrelated_bots_keywords = ['giphy', 'polly']
+    infra_keywords_extension = ['Aurora', 'Replica','CPUUtilization','Redshift', 'replication', 'rabbitmq', 'amazonMQ','CacheClusterId', 'DBInstanceIdentifier', 'QueueName', 'DBClusterIdentifier', 'Metric readIOPS', 'Metric writeIOPS','RDS']
+    unrelated_bots_keywords = ['giphy','polly']
+    grafana_keywords = ['grafana']
     source = ""
     attachments = message.get('attachments')
     files = message.get('files')
     if ('client_msg_id' in message):
         source = "Not an alert"
     elif 'bot_profile' in message:
-        source = message['bot_profile'].get('name', "")
-        if source == '':
-            source = 'custom_bot'
+        source = message['bot_profile'].get('name',"")
         if any(key_word.lower() in str(source).lower() for key_word in unrelated_bots_keywords):
             source = 'Not an alert'
     elif 'subtype' in message:
-        if (message.get('subtype') != 'bot_message'):
+        if (message.get('subtype')!='bot_message'):
             source = "Not an alert"
-        else:
+        elif 'username' in message:
+            source = message.get('username',"")
+        if source == '':
             source = 'custom_bot'
     elif attachments:
         for attachment in attachments:
@@ -82,6 +81,8 @@ def source_identifier(full_message_cell):
             source = 'Container'
         elif any(key_word.lower() in str(message).lower() for key_word in infra_keywords_extension):
             source = 'Cloudwatch'
+        elif any(key_word.lower() in str(message).lower() for key_word in grafana_keywords):
+            source = 'Grafana'
     return source
 
 
