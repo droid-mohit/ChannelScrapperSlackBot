@@ -5,12 +5,13 @@ from datetime import datetime
 from flask import request
 from flask import jsonify, Blueprint
 
+from jobs.tasks import data_fetch_job
 from persistance.db_utils import create_slack_connector_channel_scrap_schedule, get_slack_connector_channel_key, \
     get_connector_by, get_account_slack_connector, get_connector_key_by
 from processors.new_relic_rest_client import NewRelicRestApiProcessor
 from processors.sentry_client_apis import SentryApiProcessor
 from processors.slack_webclient_apis import SlackApiProcessor
-from utils.time_utils import get_current_time
+from utils.time_utils import get_current_time, get_current_datetime
 
 app_blueprint = Blueprint('app_router', __name__)
 
@@ -46,14 +47,16 @@ def slack_start_data_fetch():
     if not channel_id or not bot_auth_token:
         return jsonify({'success': False, 'message': 'Invalid arguments provided'})
 
+    slack_connector = None
     slack_connector_channel_keys = get_slack_connector_channel_key(channel_id=channel_id, is_active=True)
-    if not slack_connector_channel_keys:
-        return jsonify(
-            {'success': False, 'message': f'No active slack connector channel key found for channel_id: {channel_id}'})
-
-    slack_connector_channel_key = slack_connector_channel_keys[0]
-    slack_connector = get_account_slack_connector(record_id=slack_connector_channel_key.connector_id)
-    slack_connector = slack_connector[0]
+    if slack_connector_channel_keys and len(slack_connector_channel_keys) > 0:
+        if len(slack_connector_channel_keys) > 1:
+            print(f"Found multiple active slack connector channel keys for channel_id: {channel_id}")
+        else:
+            slack_connector_channel_key = slack_connector_channel_keys[0]
+            slack_connectors = get_account_slack_connector(record_id=slack_connector_channel_key.connector_id)
+            if slack_connectors and len(slack_connectors) > 0:
+                slack_connector = slack_connectors[0]
 
     latest_timestamp = request.args.get('latest_timestamp')
     if not latest_timestamp:
@@ -63,16 +66,30 @@ def slack_start_data_fetch():
     if not oldest_timestamp:
         oldest_timestamp = ''
 
-    slack_api_processor = SlackApiProcessor(bot_auth_token)
-    slack_api_processor.fetch_conversation_history(team_id, channel_id, latest_timestamp, oldest_timestamp)
+    if slack_connector:
+        task = data_fetch_job.delay(slack_connector.account_id,
+                                    slack_connector.id,
+                                    bot_auth_token,
+                                    channel_id,
+                                    team_id,
+                                    latest_timestamp,
+                                    '', is_first_run=True)
+        task_id = task.id
+    else:
+        slack_api_processor = SlackApiProcessor(bot_auth_token)
+        raw_data = slack_api_processor.fetch_conversation_history(team_id, channel_id, latest_timestamp,
+                                                                  oldest_timestamp)
+        if raw_data is None or not raw_data.shape[0] > 0:
+            print(f"Found no data for channel_id: {channel_id} at epoch: {get_current_datetime()}")
+            return jsonify({'success': True})
+        task_id = 'MANUAL#' + uuid.uuid4().hex
 
     data_extraction_to = datetime.fromtimestamp(float(latest_timestamp))
     data_extraction_from = None
-    if oldest_timestamp:
+    if oldest_timestamp and oldest_timestamp != '':
         data_extraction_from = datetime.fromtimestamp(float(oldest_timestamp))
-    task_run_id = 'MANUAL#' + uuid.uuid4().hex
     create_slack_connector_channel_scrap_schedule(slack_connector.account_id, slack_connector.id, channel_id,
-                                                  task_run_id, data_extraction_to, data_extraction_from)
+                                                  task_id, data_extraction_to, data_extraction_from)
     return jsonify({'success': True})
 
 
