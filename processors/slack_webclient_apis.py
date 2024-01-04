@@ -42,6 +42,7 @@ class SlackApiProcessor:
         message_counter = 0
         visit_next_cursor = True
         next_cursor = None
+        failure_count = 0
         try:
             while visit_next_cursor:
                 try:
@@ -60,8 +61,15 @@ class SlackApiProcessor:
                         f"with error: {e}")
                     continue
                 except Exception as e:
+                    failure_count = failure_count + 1
                     logger.error(
-                        f"Exception occurred while fetching conversation history for channel_id: {channel_id} with error: {e}")
+                        f"Exception occurred while fetching conversation history for channel_id: {channel_id} "
+                        f"with error: {e}")
+                    if failure_count > 10:
+                        logger.error(
+                            f"Failed to fetch conversation history for channel_id: {channel_id} after 10 retries")
+                        visit_next_cursor = False
+                        return None
                     continue
                 if not response_paginated:
                     break
