@@ -31,9 +31,19 @@ def periodic_data_fetch_job():
                 latest_schedule = get_latest_slack_connector_scrap_schedule_for_channel(connector.id, channel_id)
                 if latest_schedule and latest_schedule.metadata is not None:
                     oldest_datetime_str = latest_schedule.metadata.get('data_extraction_to', '')
-                    if oldest_datetime_str:
-                        oldest_timestamp = datetime.strptime(oldest_datetime_str, '%Y-%m-%d %H:%M:%S').timestamp()
-                        oldest_timestamp = str(oldest_timestamp)
+                    if oldest_datetime_str and oldest_datetime_str != '':
+                        try:
+                            oldest_datetime = datetime.strptime(oldest_datetime_str, '%Y-%m-%d %H:%M:%S')
+                        except Exception as e:
+                            try:
+                                oldest_datetime = datetime.strptime(oldest_datetime_str, '%Y-%m-%d %H:%M:%S.%f')
+                            except Exception as e:
+                                print(f"Exception occurred while parsing oldest_timestamp: {oldest_datetime_str} "
+                                      f"with error: {e}")
+                                oldest_datetime = None
+                        if oldest_datetime:
+                            oldest_timestamp = oldest_datetime.timestamp()
+                            oldest_timestamp = str(oldest_timestamp)
 
                 print(f"Scheduling Data Fetch Job for account:{connector.account_id} connector: {connector.id} "
                       f"channel_id: {channel_id} at epoch: {current_time} with latest_timestamp: {latest_timestamp}, "
